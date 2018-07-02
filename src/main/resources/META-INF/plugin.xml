@@ -1,0 +1,13 @@
+<idea-plugin>
+    <id>org.ermadan.Kafkalytic</id>
+    <name>Kafkalytic</name>
+    <vendor email="danila.ermakov@gmail.com">Danila Ermakov</vendor>
+
+    <description>Kafka analysis tool</description>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="org.kafkalytic.plugin.KafkaStateComponent"/>
+
+        <toolWindow id="kafkalytic" anchor="right" factoryClass="org.kafkalytic.plugin.KafkalyticToolWindowFactory"/>
+    </extensions>
+</idea-plugin>
