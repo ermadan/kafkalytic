@@ -48,19 +48,15 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
     private val refreshButton by lazy {RefreshAction()}
     private var actionToolBar: ActionToolbar? = null
 
-    val config: KafkaStateComponent = ServiceManager.getService(KafkaStateComponent::class.java)
+    private val config: KafkaStateComponent = ServiceManager.getService(KafkaStateComponent::class.java)
 
     companion object Formatter {
-        private val formatter = NumberFormat.getInstance(Locale.US) as DecimalFormat;
+        private val formatter = NumberFormat.getInstance(Locale.US) as DecimalFormat
 
         init {
-            val symbols = formatter.getDecimalFormatSymbols();
-            symbols.setGroupingSeparator(' ');
-            formatter.setDecimalFormatSymbols(symbols);
-        }
-
-        fun format(int: Int) : String {
-            return formatter.format(int)
+            val symbols = formatter.decimalFormatSymbols
+            symbols.groupingSeparator = ' '
+            formatter.decimalFormatSymbols = symbols
         }
     }
 
@@ -78,24 +74,22 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
 
         val panel = JSplitPane(JSplitPane.VERTICAL_SPLIT)
 
-        config.clusters?.forEach{LOG.info("init node:" + it);zRoot.add(KRootTreeNode(it.value))}
+        config.clusters?.forEach{LOG.info("init node:$it");zRoot.add(KRootTreeNode(it.value))}
         tree.expandPath(TreePath(zRoot))
 
-        tree.addTreeSelectionListener(object : TreeSelectionListener {
-            override fun valueChanged(e: TreeSelectionEvent?) {
-                val node = e?.newLeadSelectionPath?.lastPathComponent
-                LOG.info("selection changed:" + node)
-                if (node != null) {
-                    tableModel.updateDetails(node as DefaultMutableTreeNode)
-                }
+        tree.addTreeSelectionListener {
+            val node = it?.newLeadSelectionPath?.lastPathComponent
+            LOG.info("selection changed:$node")
+            if (node != null) {
+                tableModel.updateDetails(node as DefaultMutableTreeNode)
             }
-        })
+        }
 
         tree.addMouseListener(object : MouseAdapter() {
             override fun mousePressed(e: MouseEvent) {
                 if (SwingUtilities.isRightMouseButton(e)) {
                     val paths = tree.selectionPaths
-                    if (paths.size == 0) {
+                    if (paths.isEmpty()) {
                         return
                     }
 
@@ -108,45 +102,46 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
                             }))
                         }
                     }
-                    menu.add("Select topics", {
-                        val pattern = Messages.showInputDialog("Enter selection regexp", "Select brokers", Messages.getQuestionIcon())
+                    menu.add("Select topics") {
+                        val pattern = Messages.showInputDialog("Enter selection regexp",
+                                "Select brokers", Messages.getQuestionIcon())
                         if (pattern != null && pattern.length > 0) {
                             val parent = (paths.first().path[1] as KRootTreeNode).topics
-                            tree.selectionModel.selectionPaths = (parent.children().asSequence()
+                            tree.selectionModel.selectionPaths = parent.children().asSequence()
                                     .filter { Pattern.matches(pattern, (it as DefaultMutableTreeNode).userObject.toString()) }
-                                    .map({
-                                TreePath((tree.getModel() as DefaultTreeModel).getPathToRoot(it as TreeNode))
-                            }).toList()).toTypedArray()
+                                    .map{ TreePath((tree.model as DefaultTreeModel).getPathToRoot(it as TreeNode)) }
+                                    .toList()
+                                    .toTypedArray()
                             info(tree.selectionModel.selectionPaths.size.toString() + " brokers were selected.")
                         }
-                    })
+                    }
                     val topicNodes = paths.filter {it.lastPathComponent is KTopicTreeNode}.map{it.lastPathComponent as KTopicTreeNode}
                     val topics = topicNodes.map {it.getTopicName()}
-                    if (topics.size > 0) {
-                        menu.add("Delete topic(s)", {
+                    if (topics.isNotEmpty()) {
+                        menu.add("Delete topic(s)") {
                             if (Messages.OK == Messages.showOkCancelDialog(
                                             "You are about to delete following topics " + topics.joinToString {"\n"},
                                             "Kafka", Messages.getQuestionIcon())) {
-                                background("Deleting kafka topics", {
+                                background("Deleting kafka topics") {
                                     val cluster = topicNodes.first().cluster
                                     cluster.delete(topics)
                                     cluster.refreshTopics()
                                     treeModel.reload(cluster.topics)
                                     info("" + topics.size + " topics were deleted.")
-                                })
+                                }
                             }
-                        })
+                        }
                     }
                     if (paths.size == 1) {
                         val path = paths.first()
                         val last = path.lastPathComponent
                         val clusterNode = path.path[1] as KRootTreeNode
                         if (last is KTopicTreeNode) {
-                            menu.add("Consume from " + last.getTopicName(), {
+                            menu.add("Consume from " + last.getTopicName()) {
                                 val dialog = ConsumeDialog(last.getTopicName())
                                 dialog.show()
                                 LOG.info("progress:" + ProgressManager.getInstance().progressIndicator)
-                                ApplicationManager.getApplication().invokeLater({
+                                ApplicationManager.getApplication().invokeLater {
                                     val props = (path.path[1] as KRootTreeNode).getClusterProperties()
                                     val consumer = when (dialog.getMode()) {
                                         0 -> WaitMessageConsumer(project!!,
@@ -173,9 +168,9 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
                                     ProgressManager.getInstance().runProcessWithProgressAsynchronously(
                                             consumer, BackgroundableProcessIndicator(consumer))
 
-                                })
-                            })
-                            menu.add("Publish to " + last.getTopicName(), {
+                                }
+                            }
+                            menu.add("Publish to " + last.getTopicName()) {
                                 val dialog = ProduceDialog(project!!, last.getTopicName())
                                 if (dialog.showAndGet()) {
                                     val value = if (dialog.getMode()) {
@@ -189,48 +184,46 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
                                     ProgressManager.getInstance().runProcessWithProgressAsynchronously(
                                             producer, BackgroundableProcessIndicator(producer))
                                 }
-                            })
-                            menu.add("Change partitions number ", {
-                                val partitions = Messages.showInputDialog("Enter partitions number", "Change partitions number for topic " + last.getTopicName(), Messages.getQuestionIcon())
+                            }
+                            menu.add("Change partitions number ") {
+                                val partitions = Messages.showInputDialog("Enter partitions number",
+                                        "Change partitions number for topic " + last.getTopicName(), Messages.getQuestionIcon())
                                 if (partitions != null) {
-                                    background("Change partitions number", {
+                                    background("Change partitions number") {
                                         last.setPartitions(partitions.toInt())
-                                    })
+                                    }
                                 }
-                            })
+                            }
                         }
-                        menu.add("Refresh", {
-                            val cluster = path.path[1] as KRootTreeNode
+                        menu.add("Refresh") {
                             if (last is KRootTreeNode) {
-                                background("Refresh cluster", {
+                                background("Refresh cluster") {
                                     clusterNode.refreshTopics()
                                     clusterNode.refreshBrokers()
                                     treeModel.reload(clusterNode)
-                                })
+                                }
                             } else if (last == clusterNode.topics) {
-                                background("Refresh topics", {
+                                background("Refresh topics") {
                                     clusterNode.refreshTopics()
                                     treeModel.reload(clusterNode.topics)
-                                })
+                                }
                             }
-                        })
+                        }
                         if (last is KRootTreeNode || last == clusterNode.topics) {
-                            menu.add("Create topic", {
+                            menu.add("Create topic") {
                                 val dialog = CreateTopicDialog()
                                 if (dialog.showAndGet()) {
-                                    background("Changing partitions number", {
+                                    background("Changing partitions number") {
                                         clusterNode.createTopic(dialog.getTopic(), dialog.getPartitions(), dialog.getReplications())
                                         info("topic " + dialog.getTopic() + "was created.")
                                         clusterNode.refreshTopics()
                                         treeModel.reload(clusterNode.topics)
-                                    })
+                                    }
                                 }
-                            })
+                            }
                         }
                         if (last is KRootTreeNode) {
-                            menu.add("Remove cluster " + last.toString(), {
-                                removeCluster()
-                            })
+                            menu.add("Remove cluster " + last.toString()) { removeCluster() }
                         }
                     }
                     menu.show(tree, e.x, e.y)
@@ -239,7 +232,7 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
         })
 
         tree.isRootVisible = false
-        tree.getSelectionModel().setSelectionMode(TreeSelectionModel.DISCONTIGUOUS_TREE_SELECTION);
+        tree.selectionModel.selectionMode = TreeSelectionModel.DISCONTIGUOUS_TREE_SELECTION
         tree.addTreeExpansionListener(object : TreeExpansionListener {
             override fun treeExpanded(event: TreeExpansionEvent?) {
                 val node = event!!.path.lastPathComponent
@@ -252,12 +245,12 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
             }
         })
         val details = JBTable(tableModel)
-        details.setFillsViewportHeight(false)
+        details.fillsViewportHeight = false
         details.setShowColumns(true)
 
         panel.topComponent = JBScrollPane(tree)
         panel.bottomComponent = JBScrollPane(details)
-        panel.setResizeWeight(0.7)
+        panel.resizeWeight = 0.7
         panel.dividerSize = 2
         toolPanel.add(panel, BorderLayout.CENTER)
 
@@ -270,7 +263,7 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
                 node.refresh()
                 treeModel.reload(node)
             } catch (e: Exception) {
-                error("Unable to expand " + node, e.cause)
+                error("Unable to expand $node", e.cause)
             }
         }
     }
@@ -321,12 +314,12 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
         val dialog = CreateClusterDialog()
         dialog.show()
         if (dialog.exitCode == Messages.OK) {
-            background("Adding Kafka cluster " + dialog.inputString, {
+            background("Adding Kafka cluster " + dialog.inputString) {
                 LOG.info("added:" + dialog.getCluster())
                 zRoot.add(KRootTreeNode(dialog.getCluster()))
                 treeModel.reload(zRoot)
                 config.addCluster(dialog.getCluster())
-            })
+            }
         }
     }
 
@@ -342,7 +335,7 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
         }
 
         override fun update (e: AnActionEvent) {
-            e.getPresentation().setEnabled(removeEnabled());
+            e.presentation.setEnabled(isRemoveEnabled())
         }
     }
 
@@ -352,43 +345,40 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
         }
 
         override fun update (e: AnActionEvent) {
-            e.getPresentation().setEnabled(removeEnabled());
+            e.presentation.setEnabled(isRemoveEnabled())
         }
     }
 
-    private fun removeEnabled(): Boolean {
+    private fun isRemoveEnabled(): Boolean {
         if (tree.selectionPaths == null) {
             return false
         }
-        return tree.selectionPaths.fold(true, {a, v ->
+        return tree.selectionPaths.fold(true) { a, v ->
             val path = v.lastPathComponent
-            a && (path is KRootTreeNode) && (path?.isLeaf || path is KRootTreeNode)})
+            a && (path is KRootTreeNode) && (path?.isLeaf || path is KRootTreeNode)
+        }
     }
 
 
     private fun error(message: String, e: Throwable?) {
         LOG.error(message, e)
-        ApplicationManager.getApplication().invokeLater({
-            Messages.showErrorDialog(message + e.toString(), "Kafka")
-        })
+        ApplicationManager.getApplication().invokeLater { Messages.showErrorDialog(message + e.toString(), "Kafka") }
     }
 
     private fun info(message: String) {
         LOG.info(message)
-        ApplicationManager.getApplication().invokeLater({
-            Messages.showInfoMessage(message, "Kafka")
-        })
+        ApplicationManager.getApplication().invokeLater{ Messages.showInfoMessage(message, "Kafka") }
     }
 
     fun background(title: String, task: () -> Unit) {
-        ApplicationManager.getApplication().invokeLater({
+        ApplicationManager.getApplication().invokeLater {
             ProgressManager.getInstance().run(object: Task.Backgroundable(project, title, false) {
                 override fun run(indicator: ProgressIndicator) {
                     task()
-                    LOG.info("background task complete:" + title)
+                    LOG.info("background task complete:$title")
                 }
             })
-        })
+        }
     }
 
 }
