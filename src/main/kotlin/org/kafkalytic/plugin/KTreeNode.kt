@@ -5,6 +5,11 @@ import javax.swing.tree.DefaultMutableTreeNode
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.admin.NewPartitions
 import org.apache.kafka.clients.admin.NewTopic
+import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.common.serialization.ByteArrayDeserializer
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.kafka.common.serialization.StringSerializer
+import java.util.*
 
 const val BROKERS = "Brokers"
 const val TOPICS = "Topics"
@@ -76,6 +81,10 @@ class KRootTreeNode(userObject: Map<String, String>) : DefaultMutableTreeNode(us
 val LOG = Logger.getInstance("Kafkalytic")
 
 class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMutableTreeNode(topicName) {
+    init {
+        add(DefaultMutableTreeNode("loading..."))
+    }
+
     val cluster = clusterNode
     fun getTopicName() = userObject as String
     fun getPartitions() = cluster.client.describeTopics(listOf(getTopicName())).all().get().values.first().partitions()
@@ -83,6 +92,30 @@ class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMut
         cluster.client.createPartitions(mapOf(getTopicName() to NewPartitions.increaseTo(partitions)))
         LOG.info("Partitions for topic " + getTopicName() + " changed to " + partitions)
     }
+
+    fun expand() {
+        if (!(getChildAt(0) is KPartitionTreeNode)) {
+            removeAllChildren()
+
+            LOG.info("Connection:" + cluster.getClusterProperties())
+            val connection = HashMap(cluster.getClusterProperties())
+            connection["group.id"] = "kafkalytic"
+            connection["key.deserializer"] = ByteArrayDeserializer::class.java
+            connection["value.deserializer"] = ByteArrayDeserializer::class.java
+
+            LOG.info("bootstrap:" + connection["bootstrap.servers"])
+            val consumer = KafkaConsumer<Any, Any>(connection as Map<String, Any>)
+            consumer.subscribe(listOf(getTopicName()))
+            consumer.poll(100)
+            consumer.assignment().forEach { add(KPartitionTreeNode(it.partition(), consumer.position(it))) }
+            consumer.unsubscribe()
+            LOG.info("expanded")
+        }
+    }
+}
+
+class KPartitionTreeNode(id: Int, offset: Long) : DefaultMutableTreeNode ("partition $id offset $offset") {
+    val partitionId = id
 }
 
 class KBrokerTreeNode() : DefaultMutableTreeNode() {

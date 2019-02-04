@@ -238,6 +238,12 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
                 val node = event!!.path.lastPathComponent
                 if (node is KRootTreeNode) {
                     refreshCluster(node)
+                } else if (node is KTopicTreeNode) {
+                    background("Loading partitions") {
+                        node.expand()
+                        treeModel.reload(node)
+                        LOG.info("partitions expanded")
+                    }
                 }
             }
 
@@ -355,7 +361,7 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
         }
         return tree.selectionPaths.fold(true) { a, v ->
             val path = v.lastPathComponent
-            a && (path is KRootTreeNode) && (path?.isLeaf || path is KRootTreeNode)
+            a && (path is KRootTreeNode) && (path.isLeaf || path is KRootTreeNode)
         }
     }
 
