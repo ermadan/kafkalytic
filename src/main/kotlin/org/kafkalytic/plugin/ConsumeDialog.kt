@@ -3,8 +3,6 @@ package org.kafkalytic.plugin
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
-import com.intellij.openapi.ui.InputValidator
-import com.intellij.openapi.ui.Messages
 import org.apache.kafka.common.serialization.*
 import java.awt.BorderLayout
 import java.awt.Color
@@ -19,6 +17,7 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
     private val LOG = Logger.getInstance(this::class.java)
 
     private var waitFor: JTextField? = null
+    private var polls: JTextField? = null
     private var decrement: JTextField? = null
     private var partition: JTextField? = null
     private var offset: JTextField? = null
@@ -27,6 +26,7 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
     private var radios: List<JRadioButton>? = null
     override fun stateChanged(e: ChangeEvent?) {
         waitFor?.isEnabled = radios!![0].isSelected
+        polls?.isEnabled = radios!![0].isSelected
         decrement?.isEnabled = radios!![1].isSelected
         partition?.isEnabled = radios!![2].isSelected
         offset?.isEnabled = radios!![2].isSelected
@@ -65,13 +65,18 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
         val methodSubPanel = JPanel(GridLayout(3, 5))
         radios = arrayOf("Wait for ", "Recent ", "Specific message at ").map{JRadioButton(it)}
         methodSubPanel.add(radios!![0])
-        waitFor = JTextField()
+        waitFor = JTextField(1.toString())
         methodSubPanel.add(waitFor)
         methodSubPanel.add(JLabel(" messages"))
+        polls = JTextField(10.toString())
+        methodSubPanel.add(polls)
+        methodSubPanel.add(JLabel(" 1s polls"))
+        methodSubPanel.add(JLabel(""))
+
         (1..3).forEach{methodSubPanel.add(JLabel(""))}
 
         methodSubPanel.add(radios!![1])
-        decrement = JTextField()
+        decrement = JTextField(1.toString())
         methodSubPanel.add(decrement)
         methodSubPanel.add(JLabel(" messages"))
         (1..3).forEach{methodSubPanel.add(JLabel(""))}
@@ -120,6 +125,12 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
     fun getWaitFor() =
             if (radios!![0].isSelected) {
                 waitFor!!.text.toInt()
+            } else {
+                0
+            }
+    fun getPolls() =
+            if (radios!![0].isSelected) {
+                polls!!.text.toInt()
             } else {
                 0
             }

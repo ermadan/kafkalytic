@@ -1,5 +1,6 @@
 package org.kafkalytic.plugin
 
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.ui.InputValidator
 import com.intellij.openapi.ui.Messages
 import java.awt.BorderLayout
@@ -18,6 +19,7 @@ class CreateClusterDialog() : Messages.InputDialog(
             override fun canClose(inputString: String?) = inputString != null && inputString.length > 0
         }) {
 
+    private val LOG = Logger.getInstance(this::class.java)
     var trustPath: JTextField? = null
     var keyPath: JTextField? = null
     var trustPassword: JTextField? = null
@@ -65,6 +67,7 @@ class CreateClusterDialog() : Messages.InputDialog(
     }
 
     fun getCluster(): MutableMap<String, String> {
+        LOG.info("is enabled:" + certCheckbox!!.isEnabled)
         if (certCheckbox!!.isEnabled) {
             return hashMapOf("bootstrap.servers" to inputString!!,
                     "security.protocol" to "SSL",
@@ -73,7 +76,7 @@ class CreateClusterDialog() : Messages.InputDialog(
                     "ssl.keystore.location" to keyPath!!.text,
                     "ssl.keystore.password" to keyPassword!!.text)
         }
-        return return hashMapOf("bootstrap.servers" to inputString!!)
+        return hashMapOf("bootstrap.servers" to inputString!!)
     }
 }
 

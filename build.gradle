@@ -18,7 +18,7 @@ apply plugin: 'org.jetbrains.intellij'
 apply plugin: 'java'
 
 group 'org.ermadan'
-version '1.0-SNAPSHOT'
+version '0.1'
 
 apply plugin: 'kotlin'
 
@@ -28,8 +28,8 @@ repositories {
 
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
-    compile "org.apache.zookeeper:zookeeper:3.4.5"
-    compile "org.apache.kafka:kafka-clients:1.1.0"
+    compile "org.apache.zookeeper:zookeeper:3.4.13"
+    compile "org.apache.kafka:kafka-clients:2.0.0"
     compile "com.google.code.gson:gson:2.0"
 }
 
@@ -42,10 +42,9 @@ compileTestKotlin {
 intellij {
     version '2018.1.2'
     plugins 'coverage' //Bundled plugin dependencies
-    pluginName 'Zoolytic'
+    pluginName 'Kafkalytic'
 }
 patchPluginXml {
     changeNotes """
-      Add change notes here.<br>
-      <em>most HTML tags may be used</em>"""
+      Initial version, supported: nodes browsing, stats collection, publishing/subscription"""
 }

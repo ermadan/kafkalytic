@@ -1,13 +1,23 @@
 <idea-plugin>
-    <id>org.ermadan.Kafkalytic</id>
+    <id>org.ermadan.kafkalytic</id>
     <name>Kafkalytic</name>
     <vendor email="danila.ermakov@gmail.com">Danila Ermakov</vendor>
 
-    <description>Kafka analysis tool</description>
+    <description>Kafka analysis tool
+    - Supports multiple clusters
+        - publishing/subscription
+        - topics management: create/delete/modify
+    </description>
 
     <extensions defaultExtensionNs="com.intellij">
         <applicationService serviceImplementation="org.kafkalytic.plugin.KafkaStateComponent"/>
 
         <toolWindow id="kafkalytic" anchor="right" factoryClass="org.kafkalytic.plugin.KafkalyticToolWindowFactory"/>
     </extensions>
+
+    <change-notes>
+        Initial version, supported: nodes browsing, stats collection, publishing/subscription and multiple other actions
+        topics management: create/delete/modify
+    </change-notes>
+    <idea-version since-build="181.4505.22"/>
 </idea-plugin>

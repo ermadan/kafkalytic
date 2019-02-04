@@ -38,9 +38,9 @@ abstract class ConsumerDecrement(project: Project, val topic: String, val props:
 
     abstract fun prepare(consumer: KafkaConsumer<Any, Any>)
 
-    protected fun consume(consumer: KafkaConsumer<Any, Any>, howMany : Int) {
+    protected fun consume(consumer: KafkaConsumer<Any, Any>, howMany : Int, polls: Int = 5) {
         var consumed = 0
-        (0..5).forEach {
+        (0..polls).forEach {
             val records = consumer.poll(1000) as ConsumerRecords<String, ByteArray>
             // Handle new records
             LOG.info("polling:" + records.count())
@@ -64,7 +64,7 @@ abstract class ConsumerDecrement(project: Project, val topic: String, val props:
 
 class WaitMessageConsumer(project: Project, topic: String, props: Properties,
                               keyDeserializer: String, valueDeserializer: String,
-                              val howMany: Int) :
+                              val howMany: Int, val polls: Int) :
         ConsumerDecrement(project, topic, props, keyDeserializer, valueDeserializer) {
     override fun prepare(consumer: KafkaConsumer<Any, Any>) {
         consumer.subscribe(listOf(topic))
