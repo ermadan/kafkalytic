@@ -25,11 +25,11 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
     private lateinit var valueDeserializer: JComboBox<String>
     private lateinit var radios: List<JRadioButton>
     override fun stateChanged(e: ChangeEvent?) {
-        waitFor?.isEnabled = radios[0].isSelected
-        polls?.isEnabled = radios[0].isSelected
-        decrement?.isEnabled = radios[1].isSelected
-        partition?.isEnabled = radios[2].isSelected
-        offset?.isEnabled = radios[2].isSelected
+        waitFor.isEnabled = radios[0].isSelected
+        polls.isEnabled = radios[0].isSelected
+        decrement.isEnabled = radios[1].isSelected
+        partition.isEnabled = radios[2].isSelected
+        offset.isEnabled = radios[2].isSelected
         LOG.info("radios:" + radios[2].isSelected + ":" + radios[1].isSelected)
     }
 
