@@ -7,15 +7,13 @@ import org.apache.kafka.clients.admin.NewPartitions
 import org.apache.kafka.clients.admin.NewTopic
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
-import org.apache.kafka.common.serialization.StringDeserializer
-import org.apache.kafka.common.serialization.StringSerializer
 import java.util.*
 
 const val BROKERS = "Brokers"
 const val TOPICS = "Topics"
 
 class KRootTreeNode(userObject: Map<String, String>) : DefaultMutableTreeNode(userObject) {
-    val brokers by lazy {DefaultMutableTreeNode(BROKERS)}
+    private val brokers by lazy {DefaultMutableTreeNode(BROKERS)}
     val topics by lazy {DefaultMutableTreeNode(TOPICS)}
     init {
         add(brokers)
@@ -52,7 +50,7 @@ class KRootTreeNode(userObject: Map<String, String>) : DefaultMutableTreeNode(us
         val names = client.listTopics().listings().get().filter { !it.isInternal }.map{it.name()}.sorted()
         names.forEach {
             topics.add(KTopicTreeNode(it, this))
-            LOG.info("  topic found " + it)
+            LOG.info("  topic found $it")
         }
 
         LOG.info("Expand topics complete" + client.describeTopics(names).all().get())
@@ -115,9 +113,4 @@ class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMut
 }
 
 class KPartitionTreeNode(id: Int, offset: Long) : DefaultMutableTreeNode ("partition $id offset $offset") {
-    val partitionId = id
-}
-
-class KBrokerTreeNode() : DefaultMutableTreeNode() {
-
 }
