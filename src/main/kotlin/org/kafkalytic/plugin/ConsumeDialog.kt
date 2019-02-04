@@ -16,25 +16,25 @@ import javax.swing.event.ChangeListener
 class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
     private val LOG = Logger.getInstance(this::class.java)
 
-    private var waitFor: JTextField? = null
-    private var polls: JTextField? = null
-    private var decrement: JTextField? = null
-    private var partition: JTextField? = null
-    private var offset: JTextField? = null
-    private var keyDeserializer: JComboBox<String>? = null
-    private var valueDeserializer: JComboBox<String>? = null
-    private var radios: List<JRadioButton>? = null
+    private lateinit var waitFor : JTextField
+    private lateinit var polls: JTextField
+    private lateinit var decrement: JTextField
+    private lateinit var partition: JTextField
+    private lateinit var offset: JTextField
+    private lateinit var keyDeserializer: JComboBox<String>
+    private lateinit var valueDeserializer: JComboBox<String>
+    private lateinit var radios: List<JRadioButton>
     override fun stateChanged(e: ChangeEvent?) {
-        waitFor?.isEnabled = radios!![0].isSelected
-        polls?.isEnabled = radios!![0].isSelected
-        decrement?.isEnabled = radios!![1].isSelected
-        partition?.isEnabled = radios!![2].isSelected
-        offset?.isEnabled = radios!![2].isSelected
-        LOG.info("radios:" + radios!![2].isSelected + ":" + radios!![1].isSelected)
+        waitFor?.isEnabled = radios[0].isSelected
+        polls?.isEnabled = radios[0].isSelected
+        decrement?.isEnabled = radios[1].isSelected
+        partition?.isEnabled = radios[2].isSelected
+        offset?.isEnabled = radios[2].isSelected
+        LOG.info("radios:" + radios[2].isSelected + ":" + radios[1].isSelected)
     }
 
     init {
-        setTitle("Configure Kafka consumer for topic " + topic)
+        setTitle("Configure Kafka consumer for topic $topic")
         init()
     }
 
@@ -51,10 +51,10 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
                 LongDeserializer::class.java,
                 DoubleDeserializer::class.java).map{it.getSimpleName()}.toTypedArray()
         keyDeserializer = ComboBox(deserializers)
-        keyDeserializer?.preferredSize = Dimension(40, 24)
+        keyDeserializer.preferredSize = Dimension(40, 24)
         valueDeserializer = ComboBox(deserializers)
-        valueDeserializer?.preferredSize = Dimension(40, 24)
-        valueDeserializer?.selectedIndex = 1
+        valueDeserializer.preferredSize = Dimension(40, 24)
+        valueDeserializer.selectedIndex = 1
         deserizalizerSubPanel.add(JLabel("Key deserializer"))
         deserizalizerSubPanel.add(keyDeserializer)
         deserizalizerSubPanel.add(JLabel("Value deserializer"))
@@ -64,7 +64,7 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
 
         val methodSubPanel = JPanel(GridLayout(3, 5))
         radios = arrayOf("Wait for ", "Recent ", "Specific message at ").map{JRadioButton(it)}
-        methodSubPanel.add(radios!![0])
+        methodSubPanel.add(radios[0])
         waitFor = JTextField(1.toString())
         methodSubPanel.add(waitFor)
         methodSubPanel.add(JLabel(" messages"))
@@ -75,12 +75,12 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
 
         (1..3).forEach{methodSubPanel.add(JLabel(""))}
 
-        methodSubPanel.add(radios!![1])
+        methodSubPanel.add(radios[1])
         decrement = JTextField(1.toString())
         methodSubPanel.add(decrement)
         methodSubPanel.add(JLabel(" messages"))
         (1..3).forEach{methodSubPanel.add(JLabel(""))}
-        methodSubPanel.add(radios!![2])
+        methodSubPanel.add(radios[2])
         partition = JTextField()
         methodSubPanel.add(partition)
         methodSubPanel.add(JLabel(" partition"))
@@ -89,51 +89,50 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
         methodSubPanel.add(JLabel(" offset"))
         certPanel.add(methodSubPanel, BorderLayout.SOUTH)
         val radioGroup = ButtonGroup()
-        radios!!.forEach {
+        radios.forEach {
             radioGroup.add(it)
             it.addChangeListener(this)
         }
-//        radios!![2].isSelected = false
-        radios!![1].isSelected = true
+        radios[1].isSelected = true
         stateChanged(null)
 
         return certPanel
     }
 
-    fun getKeyDeserializer()= "org.apache.kafka.common.serialization." + keyDeserializer!!.selectedItem
-    fun getValueDeserializer()= "org.apache.kafka.common.serialization." + valueDeserializer!!.selectedItem
+    fun getKeyDeserializer()= "org.apache.kafka.common.serialization." + keyDeserializer.selectedItem
+    fun getValueDeserializer()= "org.apache.kafka.common.serialization." + valueDeserializer.selectedItem
     fun getDecrement() =
-            if (radios!![1].isSelected) {
-                decrement!!.text.toInt()
+            if (radios[1].isSelected) {
+                decrement.text.toInt()
             } else {
                 0
             }
 
     fun getPartition() =
-            if (radios!![2].isSelected) {
-                partition!!.text.toInt()
+            if (radios[2].isSelected) {
+                partition.text.toInt()
             } else {
                 0
             }
 
     fun getOffset() =
-            if (radios!![2].isSelected) {
-                offset!!.text.toLong()
+            if (radios[2].isSelected) {
+                offset.text.toLong()
             } else {
                 0
             }
     fun getWaitFor() =
-            if (radios!![0].isSelected) {
-                waitFor!!.text.toInt()
+            if (radios[0].isSelected) {
+                waitFor.text.toInt()
             } else {
                 0
             }
     fun getPolls() =
-            if (radios!![0].isSelected) {
-                polls!!.text.toInt()
+            if (radios[0].isSelected) {
+                polls.text.toInt()
             } else {
                 0
             }
-    fun getMode() = if (radios!![0].isSelected) 0 else if (radios!![1].isSelected) 1 else 2
+    fun getMode() = if (radios[0].isSelected) 0 else if (radios[1].isSelected) 1 else 2
 }
 

@@ -20,11 +20,11 @@ class CreateClusterDialog() : Messages.InputDialog(
         }) {
 
     private val LOG = Logger.getInstance(this::class.java)
-    var trustPath: JTextField? = null
-    var keyPath: JTextField? = null
-    var trustPassword: JTextField? = null
-    var keyPassword: JTextField? = null
-    var certCheckbox: JCheckBox? = null
+    private lateinit var trustPath: JTextField
+    private lateinit var keyPath: JTextField
+    private lateinit var trustPassword: JTextField
+    private lateinit var keyPassword: JTextField
+    private lateinit var certCheckbox: JCheckBox
 
     override fun createMessagePanel(): JPanel {
         val messagePanel = JPanel(BorderLayout())
@@ -55,11 +55,12 @@ class CreateClusterDialog() : Messages.InputDialog(
         certPanel.add(certSubPanel, BorderLayout.CENTER)
 
         certCheckbox = JCheckBox("User certificate")
-        certCheckbox!!.addChangeListener({event: ChangeEvent ->
-            certSubPanel.components.forEach { it.isEnabled =  certCheckbox!!.isSelected}
-        })
+        certCheckbox.isEnabled = false
+        certCheckbox.addChangeListener{
+            certSubPanel.components.forEach { it.isEnabled =  certCheckbox.isSelected}
+        }
         certPanel.add(certCheckbox, BorderLayout.NORTH)
-        certSubPanel.components.forEach { it.isEnabled =  certCheckbox!!.isSelected}
+        certSubPanel.components.forEach { it.isEnabled =  certCheckbox.isSelected}
 
         messagePanel.add(certPanel, BorderLayout.SOUTH)
 
@@ -67,14 +68,14 @@ class CreateClusterDialog() : Messages.InputDialog(
     }
 
     fun getCluster(): MutableMap<String, String> {
-        LOG.info("is enabled:" + certCheckbox!!.isEnabled)
-        if (certCheckbox!!.isEnabled) {
+        LOG.info("is enabled:" + certCheckbox.isEnabled)
+        if (certCheckbox.isEnabled) {
             return hashMapOf("bootstrap.servers" to inputString!!,
                     "security.protocol" to "SSL",
-                    "ssl.truststore.location" to trustPath!!.text,
-                    "ssl.truststore.password" to trustPassword!!.text,
-                    "ssl.keystore.location" to keyPath!!.text,
-                    "ssl.keystore.password" to keyPassword!!.text)
+                    "ssl.truststore.location" to trustPath.text,
+                    "ssl.truststore.password" to trustPassword.text,
+                    "ssl.keystore.location" to keyPath.text,
+                    "ssl.keystore.password" to keyPassword.text)
         }
         return hashMapOf("bootstrap.servers" to inputString!!)
     }
