@@ -10,13 +10,19 @@ import javax.swing.*
 import javax.swing.event.ChangeEvent
 
 class CreateClusterDialog() : Messages.InputDialog(
-        "Enter Kafka bootstrap server",
+        "Enter Kafka bootstrap server as host:port",
         "New cluster",
         Messages.getQuestionIcon(),
         null,
         object: InputValidator {
-            override fun checkInput(inputString: String?) = true
-            override fun canClose(inputString: String?) = inputString != null && inputString.length > 0
+            //domainname:port
+            private val matcher = """(?:[A-Za-z0-9-]+\.)+[A-Za-z0-9]{1,3}:\d{1,5}""".toRegex()
+            override fun checkInput(inputString: String?) = if (inputString == null) {
+                false
+            } else {
+                inputString.split(",").fold(true) { a, v -> matcher.matches(v) && a }
+            }
+            override fun canClose(inputString: String?) = inputString != null && checkInput(inputString)
         }) {
 
     private val LOG = Logger.getInstance(this::class.java)
@@ -55,7 +61,7 @@ class CreateClusterDialog() : Messages.InputDialog(
         certPanel.add(certSubPanel, BorderLayout.CENTER)
 
         certCheckbox = JCheckBox("User certificate")
-        certCheckbox.isEnabled = false
+        certCheckbox.isSelected = false
         certCheckbox.addChangeListener{
             certSubPanel.components.forEach { it.isEnabled =  certCheckbox.isSelected}
         }
@@ -68,8 +74,8 @@ class CreateClusterDialog() : Messages.InputDialog(
     }
 
     fun getCluster(): MutableMap<String, String> {
-        LOG.info("is enabled:" + certCheckbox.isEnabled)
-        if (certCheckbox.isEnabled) {
+        LOG.info("is enabled:" + certCheckbox.isSelected)
+        if (certCheckbox.isSelected) {
             return hashMapOf("bootstrap.servers" to inputString!!,
                     "security.protocol" to "SSL",
                     "ssl.truststore.location" to trustPath.text,
