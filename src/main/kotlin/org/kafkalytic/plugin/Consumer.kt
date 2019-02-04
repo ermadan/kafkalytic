@@ -94,10 +94,10 @@ class RecentMessageConsumer(project: Project, topic: String, props: Properties,
         consumer.poll(0)
         val assignments = consumer.assignment()
         val endOffsets = consumer.endOffsets(assignments);
-        endOffsets.forEach({ partition, offset ->
+        endOffsets.forEach{ partition, offset ->
             val decrement = offset - decrement
             consumer.seek(partition, if (decrement < 0) 0 else decrement);
-        })
+        }
         consume(consumer, decrement * endOffsets.size)
     }
 }
