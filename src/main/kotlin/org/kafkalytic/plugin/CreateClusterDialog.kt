@@ -15,14 +15,10 @@ class CreateClusterDialog() : Messages.InputDialog(
         Messages.getQuestionIcon(),
         null,
         object: InputValidator {
-            //domainname:port
-            private val matcher = """(?:[A-Za-z0-9-]+\.)+[A-Za-z0-9]{1,3}:\d{1,5}""".toRegex()
-            override fun checkInput(inputString: String?) = if (inputString == null) {
-                false
-            } else {
-                inputString.split(",").fold(true) { a, v -> matcher.matches(v) && a }
-            }
-            override fun canClose(inputString: String?) = inputString != null && checkInput(inputString)
+            //host:port,
+            private val matcher = """([a-zA-Z0-9.-]+:[0-9]{1,5},)*([a-zA-Z0-9-]+\.)*([a-zA-Z0-9-])+:[0-9]{1,5}""".toRegex()
+            override fun checkInput(inputString: String?) = inputString != null && matcher.matches(inputString)
+            override fun canClose(inputString: String?) = checkInput(inputString)
         }) {
 
     private val LOG = Logger.getInstance(this::class.java)

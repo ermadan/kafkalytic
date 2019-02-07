@@ -12,12 +12,17 @@ class TableModel() : DefaultTableModel() {
             addColumn("Partition Id")
             addColumn("ISR")
             addColumn("Leader")
-            node.getPartitions().forEach {
-                addRow(arrayOf(
-                        it.partition(),
-                        it.isr().joinToString { it.id().toString() },
-                        it.leader().id().toString()
-                ))
+            addColumn("Offset")
+            background(null, "reading offsets") {
+                val offsets = getOffsets(node.cluster.getClusterProperties(), node.getTopicName())
+                node.getPartitions().forEach {
+                    addRow(arrayOf(
+                            it.partition(),
+                            it.isr().joinToString { it.id().toString() },
+                            it.leader().id().toString(),
+                            offsets.find{ p -> p.first == it.partition()}?.second
+                    ))
+                }
             }
         } else if (node is KRootTreeNode) {
             addColumn("Host")

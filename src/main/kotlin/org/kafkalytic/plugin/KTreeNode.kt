@@ -1,13 +1,10 @@
 package org.kafkalytic.plugin
 
 import com.intellij.openapi.diagnostic.Logger
-import javax.swing.tree.DefaultMutableTreeNode
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.admin.NewPartitions
 import org.apache.kafka.clients.admin.NewTopic
-import org.apache.kafka.clients.consumer.KafkaConsumer
-import org.apache.kafka.common.serialization.ByteArrayDeserializer
-import java.util.*
+import javax.swing.tree.DefaultMutableTreeNode
 
 const val BROKERS = "Brokers"
 const val TOPICS = "Topics"
@@ -94,20 +91,7 @@ class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMut
     fun expand() {
         if (!(getChildAt(0) is KPartitionTreeNode)) {
             removeAllChildren()
-
-            LOG.info("Connection:" + cluster.getClusterProperties())
-            val connection = HashMap(cluster.getClusterProperties())
-            connection["group.id"] = "kafkalytic"
-            connection["key.deserializer"] = ByteArrayDeserializer::class.java
-            connection["value.deserializer"] = ByteArrayDeserializer::class.java
-
-            LOG.info("bootstrap:" + connection["bootstrap.servers"])
-            val consumer = KafkaConsumer<Any, Any>(connection as Map<String, Any>)
-            consumer.subscribe(listOf(getTopicName()))
-            consumer.poll(100)
-            consumer.assignment().forEach { add(KPartitionTreeNode(it.partition(), consumer.position(it))) }
-            consumer.unsubscribe()
-            LOG.info("expanded")
+            getOffsets(cluster.getClusterProperties(), getTopicName()).forEach{ add(KPartitionTreeNode(it.first, it.second)) }
         }
     }
 }

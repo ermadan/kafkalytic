@@ -181,8 +181,9 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
                                     val producer = Producer(project!!, last.getTopicName(),
                                             last.cluster.getClusterProperties(),
                                             dialog.getKey(), value)
-                                    ProgressManager.getInstance().runProcessWithProgressAsynchronously(
-                                            producer, BackgroundableProcessIndicator(producer))
+                                    background("Publish") { producer.run() }
+//                                    ProgressManager.getInstance().runProcessWithProgressAsynchronously(
+//                                            producer, BackgroundableProcessIndicator(producer))
                                 }
                             }
                             menu.add("Change partitions number ") {
@@ -377,15 +378,17 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
     }
 
     fun background(title: String, task: () -> Unit) {
-        ApplicationManager.getApplication().invokeLater {
-            ProgressManager.getInstance().run(object: Task.Backgroundable(project, title, false) {
-                override fun run(indicator: ProgressIndicator) {
-                    task()
-                    LOG.info("background task complete:$title")
-                }
-            })
-        }
+        background(project!!, title, task)
     }
-
 }
 
+fun background(project: Project?, title: String, task: () -> Unit) {
+    ApplicationManager.getApplication().invokeLater {
+        ProgressManager.getInstance().run(object: Task.Backgroundable(project, title, false) {
+            override fun run(indicator: ProgressIndicator) {
+                task()
+                LOG.info("background task complete:$title")
+            }
+        })
+    }
+}

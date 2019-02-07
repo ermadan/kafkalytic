@@ -1,5 +1,8 @@
 package org.kafkalytic.plugin
 
+import com.intellij.notification.Notification
+import com.intellij.notification.NotificationType
+import com.intellij.notification.Notifications
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
@@ -11,10 +14,14 @@ import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.apache.kafka.common.serialization.StringSerializer
 
 class Producer(project: Project, val topic: String, val props: Properties, val key: String, val value: ByteArray)
-    : Task.Backgroundable(project, "Consume from " + topic, true) {
+    : Task.Backgroundable(project, "Consume from $topic", true) {
     private val LOG = Logger.getInstance(this::class.java)
 
     override fun run(indicator: ProgressIndicator) {
+        run()
+    }
+
+    fun run() {
         props.put("acks", "all");
         props.put("retries", 0);
         props.put("batch.size", 16384);
@@ -28,7 +35,8 @@ class Producer(project: Project, val topic: String, val props: Properties, val k
         val producer = KafkaProducer<String, ByteArray>(props)
 
         producer.send(ProducerRecord<String, ByteArray>(topic, key, value))
-        LOG.info("sent:" + key)
+        LOG.info("sent:$key")
+        Notifications.Bus.notify(Notification("Kafkalytic", "Kafka", "Published $key", NotificationType.INFORMATION))
         producer.close()
     }
 }

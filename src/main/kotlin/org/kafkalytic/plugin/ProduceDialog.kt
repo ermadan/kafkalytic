@@ -21,15 +21,15 @@ import javax.swing.event.ChangeListener
 class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false), ChangeListener {
     private val LOG = Logger.getInstance(this::class.java)
 
-    private var file: JTextField? =  null
-    private var value: JTextArea? = null
-    private var key: JTextField? = null
-    private var keySerializer: JComboBox<String>? = null
-    private var valueSerializer: JComboBox<String>? = null
-    private var radios: List<JRadioButton>? = null
+    private lateinit var file: JTextField
+    private lateinit var value: JTextArea
+    private lateinit var key: JTextField
+    private lateinit var keySerializer: JComboBox<String>
+    private lateinit var valueSerializer: JComboBox<String>
+    private lateinit var radios: List<JRadioButton>
     override fun stateChanged(e: ChangeEvent?) {
-        file?.isEnabled = radios!![0].isSelected
-        value?.isEnabled = radios!![1].isSelected
+        file.isEnabled = radios[0].isSelected
+        value.isEnabled = radios[1].isSelected
     }
 
     init {
@@ -40,68 +40,61 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
     override fun createCenterPanel(): JPanel {
         val certPanel = JPanel(BorderLayout())
 
-        val gridLayout = GridLayout(0, 2)
-        gridLayout.hgap = 2
-        gridLayout.vgap = 2
-//        val deserizalizerSubPanel = JPanel(gridLayout)
-//        val deserializers = arrayOf(StringDeserializer::class.java,
-//                ByteArrayDeserializer::class.java,
-//                IntegerDeserializer::class.java,
-//                LongDeserializer::class.java,
-//                DoubleDeserializer::class.java).map{it.getSimpleName()}.toTypedArray()
-//        keySerializer = ComboBox(deserializers)
-//        keySerializer?.preferredSize = Dimension(40, 24)
-//        valueSerializer = ComboBox(deserializers)
-//        valueSerializer?.preferredSize = Dimension(40, 24)
-//        valueSerializer?.selectedIndex = 1
-//        deserizalizerSubPanel.add(JLabel("Key serializer"))
-//        deserizalizerSubPanel.add(keySerializer)
-//        deserizalizerSubPanel.add(JLabel("Value serializer"))
-//        deserizalizerSubPanel.add(valueSerializer)
-//        deserizalizerSubPanel.border = BorderFactory.createLineBorder(Color.GRAY, 1, true)
-//        certPanel.add(deserizalizerSubPanel, BorderLayout.NORTH)
+        val serializers = arrayOf(StringSerializer::class.java,
+                ByteArraySerializer::class.java,
+                IntegerSerializer::class.java,
+                LongSerializer::class.java,
+                DoubleSerializer::class.java).map{ it.simpleName }.toTypedArray()
+        keySerializer = ComboBox(serializers)
+        valueSerializer = ComboBox(serializers)
 
         val keySubPanel = JPanel(FlowLayout(FlowLayout.LEADING))
         key = JTextField()
-        key?.preferredSize = Dimension(200, 24)
+        key.preferredSize = Dimension(200, 24)
         keySubPanel.add(JBLabel("Key "))
+        keySubPanel.add(keySerializer)
         keySubPanel.add(key)
+        val valueSubPanel = JPanel(BorderLayout())
+        val serializerSubPanel = JPanel(FlowLayout(FlowLayout.LEADING))
+        serializerSubPanel.add(JBLabel("Value"))
+        serializerSubPanel.add(valueSerializer)
         val loadSubPanel = JPanel(FlowLayout(FlowLayout.LEADING))
         val textSubPanel = JPanel(FlowLayout(FlowLayout.LEADING))
-        radios = arrayOf("Load from file ", "Text ").map{JRadioButton(it)}
-        loadSubPanel.add(radios!![0])
+        radios = arrayOf("Load from file ", "Text ").map{ JRadioButton(it) }
+        loadSubPanel.add(radios[0])
         file = JTextField()
-        file?.preferredSize = Dimension(200, 24)
+        file.preferredSize = Dimension(200, 24)
         loadSubPanel.add(file)
         val browse = JButton("Browse")
-        browse.addActionListener({
+        browse.addActionListener{
             val fcd = FileChooserDescriptor(true, false, false, false, false, false)
-            file?.text = FileChooser.chooseFile(fcd, project, null)?.canonicalPath
-        })
+            file.text = FileChooser.chooseFile(fcd, project, null)?.canonicalPath
+        }
 
         loadSubPanel.add(browse)
-        textSubPanel.add(radios!![1])
+        textSubPanel.add(radios[1])
         value = JTextArea(10, 43)
-        value?.setLineWrap(true)
+        value.lineWrap = true
         val jScrollPane1 = JBScrollPane(value)
         textSubPanel.add(jScrollPane1)
         certPanel.add(keySubPanel, BorderLayout.NORTH)
-        certPanel.add(loadSubPanel, BorderLayout.CENTER)
-        certPanel.add(textSubPanel, BorderLayout.SOUTH)
+        certPanel.add(valueSubPanel, BorderLayout.CENTER)
+        valueSubPanel.add(serializerSubPanel, BorderLayout.NORTH)
+        valueSubPanel.add(loadSubPanel, BorderLayout.CENTER)
+        valueSubPanel.add(textSubPanel, BorderLayout.SOUTH)
         val radioGroup = ButtonGroup()
-        radios!!.forEach {
+        radios.forEach {
             radioGroup.add(it)
             it.addChangeListener(this)
         }
-        radios!![1].isSelected = true
+        radios[1].isSelected = true
         stateChanged(null)
 
         return certPanel
     }
 
-    fun getKey() = key!!.text
-    fun getFile() = file!!.text
-    fun getText() = value!!.text
-
-    fun getMode() = radios!![0].isSelected
+    fun getKey() = key.text
+    fun getFile() = file.text
+    fun getText() = value.text
+    fun getMode() = radios[0].isSelected
 }

@@ -14,7 +14,7 @@ import java.util.*
 
 abstract class ConsumerDecrement(project: Project, val topic: String, val props: Properties,
                         val keyDeserializer: String, val valueDeserializer: String)
-    : Task.Backgroundable(project, "Consume from " + topic, true) {
+    : Task.Backgroundable(project, "Consume from $topic", true) {
     private val LOG = Logger.getInstance(this::class.java)
 
     override fun run(indicator: ProgressIndicator) {
@@ -32,7 +32,7 @@ abstract class ConsumerDecrement(project: Project, val topic: String, val props:
         val consumer = KafkaConsumer<Any, Any>(props)
         prepare(consumer)
 
-        LOG.info("background task complete:" + title)
+        LOG.info("background task complete:$title")
         consumer.unsubscribe()
     }
 
@@ -41,23 +41,26 @@ abstract class ConsumerDecrement(project: Project, val topic: String, val props:
     protected fun consume(consumer: KafkaConsumer<Any, Any>, howMany : Int, polls: Int = 5) {
         var consumed = 0
         (0..polls).forEach {
-            val records = consumer.poll(1000) as ConsumerRecords<String, ByteArray>
+            val records = consumer.poll(1000) as ConsumerRecords<Any, Any>
             // Handle new records
             LOG.info("polling:" + records.count())
             records.forEach {
-                Notifications.Bus.notify(Notification("Kafkalytic", "topic:" + topic, "key:" + it.key()
-                        + ", partition:" + it.partition() + ", offset:" + it.offset() + ", message:" + String(it.value()), NotificationType.INFORMATION));
+                Notifications.Bus.notify(Notification("Kafkalytic", "topic:$topic",
+                        "key:$it.key()"
+                        + ", partition:" + it.partition()
+                        + ", offset:" + it.offset()
+                        + ", message:" + it.value().toString(), NotificationType.INFORMATION));
                 consumed++
                 if (consumed == howMany) {
                     return
                 }
-                System.out.println(it.key());
+                LOG.info("Consumed:$it.key()")
             }
         }
     }
 
     override fun onCancel() {
-        LOG.info("background task complete:" + title)
+        LOG.info("background task complete:$title")
         super.onCancel()
     }
 }
@@ -93,7 +96,8 @@ class RecentMessageConsumer(project: Project, topic: String, props: Properties,
         consumer.subscribe(listOf(topic))
         consumer.poll(0)
         val assignments = consumer.assignment()
-        val endOffsets = consumer.endOffsets(assignments);
+        val endOffsets = consumer.endOffsets(assignments)
+        LOG.info("Iterating partitions with offsets $endOffsets")
         endOffsets.forEach{ partition, offset ->
             val decrement = offset - decrement
             consumer.seek(partition, if (decrement < 0) 0 else decrement);
