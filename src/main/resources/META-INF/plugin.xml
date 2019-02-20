@@ -3,10 +3,21 @@
     <name>Kafkalytic</name>
     <vendor email="danila.ermakov@gmail.com">Danila Ermakov</vendor>
 
-    <description>Kafka analysis tool
-    - Supports multiple clusters
-        - publishing/subscription
-        - topics management: create/delete/modify
+    <description>
+        &lt;h4&gt;Kafka analysis tool:&lt;/h4&gt;
+        &lt;ul&gt;
+        &lt;li&gt;Multiple clusters support&lt;/li&gt;
+        &lt;li&gt;Topics management: create/delete/change partitions&lt;/li&gt;
+        &lt;li&gt;Search topics with regexp&lt;/li&gt;
+        &lt;li&gt;Publish String/Byte serialized messages&lt;/li&gt;
+        &lt;li&gt;Consume messages with different strategies
+            &lt;ul&gt;
+                &lt;li&gt;wait for messages withint specified poll time&lt;/li&gt;
+                &lt;li&gt;read latest messages&lt;/li&gt;
+                &lt;li&gt;read messages from specific partition with specific offset&lt;/li&gt;
+            &lt;/ul&gt;
+        &lt;/li&gt;
+        &lt;/ul&gt;
     </description>
 
     <extensions defaultExtensionNs="com.intellij">
@@ -19,5 +30,6 @@
         Initial version, supported: nodes browsing, stats collection, publishing/subscription and multiple other actions
         topics management: create/delete/modify
     </change-notes>
-    <idea-version since-build="181.4505.22"/>
+    <depends>com.intellij.modules.lang</depends>
+    <idea-version since-build="180.*"/>
 </idea-plugin>
