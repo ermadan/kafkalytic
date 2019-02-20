@@ -73,7 +73,7 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
         methodSubPanel.add(JLabel(" 1s polls"))
         methodSubPanel.add(JLabel(""))
 
-        (1..3).forEach{methodSubPanel.add(JLabel(""))}
+//        (1..3).forEach{methodSubPanel.add(JLabel(""))}
 
         methodSubPanel.add(radios[1])
         decrement = JTextField(1.toString())

@@ -53,10 +53,9 @@ class CreateClusterDialog() : Messages.InputDialog(
         certSubPanel.add(keyPath)
         certSubPanel.add(JLabel("Keystore password"))
         certSubPanel.add(keyPassword)
-        certSubPanel.border = BorderFactory.createLineBorder(Color.GRAY)
         certPanel.add(certSubPanel, BorderLayout.CENTER)
 
-        certCheckbox = JCheckBox("User certificate")
+        certCheckbox = JCheckBox("Use certificates to connect:")
         certCheckbox.isSelected = false
         certCheckbox.addChangeListener{
             certSubPanel.components.forEach { it.isEnabled =  certCheckbox.isSelected}
