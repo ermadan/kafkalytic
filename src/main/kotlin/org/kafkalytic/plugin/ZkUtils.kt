@@ -1,4 +1,4 @@
-package org.zoolytic.plugin
+package org.kafkalytic.plugin
 
 import com.intellij.openapi.diagnostic.Logger
 import org.apache.zookeeper.WatchedEvent
@@ -18,23 +18,23 @@ object ZkUtils {
     fun getZk(source: String): ZooKeeper {
         val latch = CountDownLatch(1)
         var zk: ZooKeeper? = zookeepers[source]
-//        LOG.info("Found zk:" + zk)
+        LOG.info("Found zk:" + zk)
         if (zk != null && zk.state != ZooKeeper.States.CONNECTED) {
             zk = null
         }
         if (zk == null) {
-//            LOG.info("Establishing connection....")
+            LOG.info("Establishing connection....")
             zk = ZooKeeper(source, 1000) { event: WatchedEvent ->
-//                LOG.info("evnt:" + event)
+                LOG.info("evnt:" + event)
                 if (event.state == Watcher.Event.KeeperState.SyncConnected) {
                     latch.countDown()
                 }
             }
             if (latch.await(10, TimeUnit.SECONDS)) {
                 zookeepers[source] = zk
-//                LOG.info("Connection established")
+                LOG.info("Connection established")
             } else {
-//                LOG.info("Connection timed out")
+                LOG.info("Connection timed out")
                 throw IOException("Couldnt establish connection: " + source)
             }
         }
