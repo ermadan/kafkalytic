@@ -12,7 +12,7 @@
         &lt;li&gt;Publish String/Byte serialized messages&lt;/li&gt;
         &lt;li&gt;Consume messages with different strategies
             &lt;ul&gt;
-                &lt;li&gt;wait for messages withint specified poll time&lt;/li&gt;
+                &lt;li&gt;wait for messages within specified poll time&lt;/li&gt;
                 &lt;li&gt;read latest messages&lt;/li&gt;
                 &lt;li&gt;read messages from specific partition with specific offset&lt;/li&gt;
             &lt;/ul&gt;
@@ -27,8 +27,7 @@
     </extensions>
 
     <change-notes>
-        Initial version, supported: nodes browsing, stats collection, publishing/subscription and multiple other actions
-        topics management: create/delete/modify
+        fixed bugs related to multiple ide instances running at same time
     </change-notes>
     <depends>com.intellij.modules.lang</depends>
     <idea-version since-build="180.*"/>
