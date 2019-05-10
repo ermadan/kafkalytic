@@ -18,7 +18,7 @@ apply plugin: 'org.jetbrains.intellij'
 apply plugin: 'java'
 
 group 'org.ermadan'
-version '0.4'
+version '0.6'
 
 apply plugin: 'kotlin'
 
@@ -47,5 +47,5 @@ intellij {
 }
 patchPluginXml {
     changeNotes """
-      fixed bug with ssl certificate connection error"""
+      multiple bugfixes"""
 }

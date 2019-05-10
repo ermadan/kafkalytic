@@ -3,6 +3,7 @@ package org.kafkalytic.plugin
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.BackgroundTaskQueue
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
@@ -41,8 +42,10 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
     private val refreshButton by lazy {RefreshAction()}
     private val config = stateComponent
     private val project = project
+    val taskQueue = BackgroundTaskQueue(project, "Kafkalytic queque")
 
     init {
+        LOG.info("Main window created")
         add(getToolbar(), BorderLayout.PAGE_START)
 
 
@@ -55,7 +58,12 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
             val node = it?.newLeadSelectionPath?.lastPathComponent
             LOG.info("selection changed:$node")
             if (node != null) {
-                tableModel.updateDetails(node as DefaultMutableTreeNode)
+                background("Loading properties") {
+                    (node as KafkaNode).expand()
+                    foreground {
+                        tableModel.updateDetails(node as DefaultMutableTreeNode)
+                    }
+                }
             }
         }
 
@@ -206,10 +214,9 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
             override fun treeExpanded(event: TreeExpansionEvent?) {
                 val node = event!!.path.lastPathComponent
                 if (node is KafkaNode) {
-                    background("Loading partitions") {
+                    background("Expanding node") {
                         node.expand()
                         treeModel.reload(node)
-                        LOG.info("partitions expanded")
                     }
                 }
             }
@@ -229,12 +236,21 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
     }
 
     private fun refreshCluster(node: KafkaNode) {
-        background("refreshing $node") {
-            try {
-                node.refresh()
-                treeModel.reload(node as DefaultMutableTreeNode)
-            } catch (e: Exception) {
-                error("Unable to expand $node", e.cause)
+        if (node is DefaultMutableTreeNode) {
+            if (!(node is KRootTreeNode)) {
+                    node.removeAllChildren()
+                    node.add(DefaultMutableTreeNode("loading..."))
+                    treeModel.reload(node)
+            }
+            background("refreshing $node") {
+                try {
+                    node.refresh()
+                    foreground {
+                        treeModel.reload(node)
+                    }
+                } catch (e: Exception) {
+                    error("Unable to expand $node", e.cause)
+                }
             }
         }
     }
@@ -343,18 +359,22 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
         ApplicationManager.getApplication().invokeLater{ Messages.showInfoMessage(message, "Kafka") }
     }
 
+    fun foreground(task: () -> Unit) {
+        ApplicationManager.getApplication().invokeLater(task)
+    }
+
     fun background(title: String, task: () -> Unit) {
         background(project, title, task)
     }
-}
 
-fun background(project: Project?, title: String, task: () -> Unit) {
-    ApplicationManager.getApplication().invokeLater {
-        ProgressManager.getInstance().run(object: Task.Backgroundable(project, title, false) {
+    fun background(project: Project?, title: String, task: () -> Unit) {
+        taskQueue.run(object: Task.Backgroundable(project, title, false) {
             override fun run(indicator: ProgressIndicator) {
+                LOG.info("background task started:$title")
                 task()
                 LOG.info("background task complete:$title")
             }
         })
     }
 }
+

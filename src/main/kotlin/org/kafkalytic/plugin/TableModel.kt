@@ -10,9 +10,7 @@ class TableModel() : DefaultTableModel() {
         columnIdentifiers.clear()
         if (node is KafkaTableNode) {
             node.headers().forEach{ addColumn(it) }
-            background(null, "reading properties") {
-                node.rows().forEach { addRow(it) }
-            }
+            node.rows().forEach { addRow(it) }
         }
     }
 }

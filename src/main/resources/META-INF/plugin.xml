@@ -18,6 +18,8 @@
             &lt;/ul&gt;
         &lt;/li&gt;
         &lt;/ul&gt;
+
+        bug tracker: https://github.com/ermadan/kafkalytic/issues
     </description>
 
     <extensions defaultExtensionNs="com.intellij">

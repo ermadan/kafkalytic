@@ -185,12 +185,15 @@ class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMut
     }
 
     override fun refresh() {
+        LOG.info("Refresh partitions")
         offsets_ = null
+        getOffsets()
         removeAllChildren()
         getOffsets().forEach{ add(KPartitionTreeNode(it.first, it.second)) }
     }
 
     override fun expand() {
+        LOG.info("Expand partitions")
         if (!(getChildAt(0) is KPartitionTreeNode)) {
             removeAllChildren()
             getOffsets().forEach{ add(KPartitionTreeNode(it.first, it.second)) }
