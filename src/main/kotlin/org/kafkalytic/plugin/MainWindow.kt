@@ -127,28 +127,7 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
                                     LOG.info("progress:" + ProgressManager.getInstance().progressIndicator)
                                     ApplicationManager.getApplication().invokeLater {
                                         val props = clusterNode.getClusterProperties()
-                                        val consumer = when (dialog.getMode()) {
-                                            0 -> WaitMessageConsumer(project!!,
-                                                    last.getTopicName(),
-                                                    props,
-                                                    dialog.getKeyDeserializer(),
-                                                    dialog.getValueDeserializer(),
-                                                    dialog.getWaitFor(), dialog.getPolls())
-                                            1 -> RecentMessageConsumer(project!!,
-                                                    last.getTopicName(),
-                                                    props,
-                                                    dialog.getKeyDeserializer(),
-                                                    dialog.getValueDeserializer(),
-                                                    dialog.getDecrement())
-                                            2 -> SpecificMessageConsumer(project!!,
-                                                    last.getTopicName(),
-                                                    props,
-                                                    dialog.getKeyDeserializer(),
-                                                    dialog.getValueDeserializer(),
-                                                    dialog.getPartition(),
-                                                    dialog.getOffset())
-                                            else -> throw IllegalArgumentException()
-                                        }
+                                        val consumer = Consumer(project, last.getTopicName(), props, dialog)
                                         ProgressManager.getInstance().runProcessWithProgressAsynchronously(
                                                 consumer, BackgroundableProcessIndicator(consumer))
 
@@ -156,14 +135,14 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
                                 }
                             }
                             menu.add("Publish to " + last.getTopicName()) {
-                                val dialog = ProduceDialog(project!!, last.getTopicName())
+                                val dialog = ProduceDialog(project, last.getTopicName())
                                 if (dialog.showAndGet()) {
                                     val value = if (dialog.getMode()) {
                                         File(dialog.getFile()).inputStream().readBytes()
                                     } else {
                                         dialog.getText().toByteArray()
                                     }
-                                    val producer = Producer(project!!, last.getTopicName(),
+                                    val producer = Producer(project, last.getTopicName(),
                                             last.cluster.getClusterProperties(),
                                             dialog.getKey(), value)
                                     background("Publish") { producer.run() }
