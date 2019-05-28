@@ -59,7 +59,9 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
             LOG.info("selection changed:$node")
             if (node != null) {
                 background("Loading properties") {
-                    (node as KafkaNode).expand()
+                    if (node is KafkaNode) {
+                        node.expand()
+                    }
                     foreground {
                         tableModel.updateDetails(node as DefaultMutableTreeNode)
                     }
