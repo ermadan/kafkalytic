@@ -21,6 +21,7 @@ import java.awt.event.ActionEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.File
+import java.util.*
 import java.util.regex.Pattern
 import javax.swing.*
 import javax.swing.event.DocumentEvent
@@ -88,15 +89,15 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
                     }
                     menu.add("Select topics") {
                         val pattern = Messages.showInputDialog("Enter selection regexp",
-                                "Select brokers", Messages.getQuestionIcon())
-                        if (pattern != null && pattern.length > 0) {
+                                "Select topics", Messages.getQuestionIcon())
+                        if (!pattern.isNullOrEmpty()) {
                             val parent = (paths.first().path[1] as KRootTreeNode).topics
                             tree.selectionModel.selectionPaths = parent.children().asSequence()
                                     .filter { Pattern.matches(pattern, (it as DefaultMutableTreeNode).userObject.toString()) }
                                     .map{ TreePath((tree.model as DefaultTreeModel).getPathToRoot(it as TreeNode)) }
                                     .toList()
                                     .toTypedArray()
-                            info(tree.selectionModel.selectionPaths.size.toString() + " brokers were selected.")
+                            info(tree.selectionModel.selectionPaths.size.toString() + " topics were selected.")
                         }
                     }
                     val topicNodes = paths.filter {it.lastPathComponent is KTopicTreeNode}.map{it.lastPathComponent as KTopicTreeNode}
@@ -267,7 +268,15 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
         val searchTextField = SearchTextField()
         searchTextField.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent?) {
-                updateTree(searchTextField.text!!)
+                if (e != null) {
+                    val pattern = e.document.getText(0, e.document.length).toLowerCase()
+                    tree.selectionModel.selectionPaths = findNodes(zRoot, pattern).map { leaf ->
+                        generateSequence(leaf) { it.parent }.toList().reversed().toTypedArray()
+                    }.map {
+                        TreePath(it)
+                    }.toTypedArray()
+                    LOG.info("Selected topics ${tree.selectionModel.selectionPaths.size}")
+                }
             }
         })
 
@@ -276,6 +285,12 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
         return panel
     }
 
+    private fun findNodes(parent: TreeNode, text: String) : Collection<TreeNode> {
+        val children = (parent.children() as Enumeration<TreeNode>).toList()
+        return children
+                .mapNotNull { if (it.toString().toLowerCase().indexOf(text) >= 0) listOf(it) else findNodes(it, text)}
+                .flatten()
+    }
 
     private fun addCluster() {
         val dialog = CreateClusterDialog()
