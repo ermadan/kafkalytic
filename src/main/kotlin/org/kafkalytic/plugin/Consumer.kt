@@ -18,14 +18,14 @@ class Consumer(project: Project, val topic: String, val props: Properties, val d
     private val LOG = Logger.getInstance(this::class.java)
 
     override fun run(indicator: ProgressIndicator) {
-        val local = Properties(props)
+        val local = props.clone() as Properties
 
         local.put("group.id", "test")
         local.put("enable.auto.commit", "false")
         local.put("session.timeout.ms", "30000")
         local.put("key.deserializer", Class.forName(dialog.getKeyDeserializer()))
         local.put("value.deserializer", Class.forName(dialog.getValueDeserializer()))
-        local.put("max.poll.records",1)
+        local.put("max.poll.records", 1)
 
         LOG.info(local.toString())
         LOG.info(props.toString())
