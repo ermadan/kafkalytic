@@ -10,6 +10,7 @@ import com.intellij.openapi.project.Project
 import org.apache.kafka.clients.consumer.ConsumerRecords
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.TopicPartition
+import java.time.Duration
 import java.util.*
 
 class Consumer(project: Project, val topic: String, val props: Properties, val dialog: ConsumeDialog)
@@ -19,16 +20,16 @@ class Consumer(project: Project, val topic: String, val props: Properties, val d
     override fun run(indicator: ProgressIndicator) {
         val local = Properties(props)
 
-        props.put("group.id", "test");
-        props.put("enable.auto.commit", "false");
-        props.put("session.timeout.ms", "30000");
-        props.put("key.deserializer", Class.forName(dialog.getKeyDeserializer()));
-        props.put("value.deserializer", Class.forName(dialog.getValueDeserializer()));
-        props.put("max.poll.records",1);
+        local.put("group.id", "test")
+        local.put("enable.auto.commit", "false")
+        local.put("session.timeout.ms", "30000")
+        local.put("key.deserializer", Class.forName(dialog.getKeyDeserializer()))
+        local.put("value.deserializer", Class.forName(dialog.getValueDeserializer()))
+        local.put("max.poll.records",1)
 
         LOG.info(local.toString())
         LOG.info(props.toString())
-        val consumer = KafkaConsumer<Any, Any>(props)
+        val consumer = KafkaConsumer<Any, Any>(local)
         when (dialog.getMode()) {
             0 -> {
                 consumer.subscribe(listOf(topic))
@@ -36,11 +37,11 @@ class Consumer(project: Project, val topic: String, val props: Properties, val d
             }
             1 -> {
                 consumer.subscribe(listOf(topic))
-                consumer.poll(0)
+                consumer.poll(Duration.ofSeconds(1))
                 val assignments = consumer.assignment()
                 val endOffsets = consumer.endOffsets(assignments)
                 LOG.info("Iterating partitions with offsets $endOffsets")
-                endOffsets.forEach{ partition, offset ->
+                endOffsets.forEach{ (partition, offset) ->
                     consumer.seek(partition, if (dialog.getDecrement() > offset) 0 else offset - dialog.getDecrement())
                 }
                 consume(consumer, dialog.getDecrement() * endOffsets.size)
@@ -59,8 +60,8 @@ class Consumer(project: Project, val topic: String, val props: Properties, val d
 
     protected fun consume(consumer: KafkaConsumer<Any, Any>, howMany : Int, polls: Int = 5) {
         var consumed = 0
-        (0..polls).forEach {
-            val records = consumer.poll(1000) as ConsumerRecords<Any, Any>
+        (0..polls).forEach { _ ->
+            val records = consumer.poll(Duration.ofSeconds(1)) as ConsumerRecords<Any, Any>
             // Handle new records
             LOG.info("polling:" + records.count())
             records.forEach {
@@ -68,7 +69,7 @@ class Consumer(project: Project, val topic: String, val props: Properties, val d
                         "key:$it.key()"
                         + ", partition:" + it.partition()
                         + ", offset:" + it.offset()
-                        + ", message:" + it.value().toString(), NotificationType.INFORMATION));
+                        + ", message:" + it.value().toString(), NotificationType.INFORMATION))
                 consumed++
                 if (consumed == howMany) {
                     return
