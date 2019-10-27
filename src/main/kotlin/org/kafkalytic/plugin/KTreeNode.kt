@@ -136,7 +136,7 @@ class KRootTreeNode(userObject: Map<String, String>) : DefaultMutableTreeNode(us
     override fun rows() : List<Array<String>> {
         return getClusterProperties()["bootstrap.servers"]
                 .toString()
-                .split(";")
+                .split(",")
                 .map { it.split(":").toTypedArray() }
     }
 
