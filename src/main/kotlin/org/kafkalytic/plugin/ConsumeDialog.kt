@@ -49,12 +49,11 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
                 ByteArrayDeserializer::class.java,
                 IntegerDeserializer::class.java,
                 LongDeserializer::class.java,
-                DoubleDeserializer::class.java).map{it.getSimpleName()}.toTypedArray()
+                DoubleDeserializer::class.java).map { it.getSimpleName() }.toTypedArray()
         keyDeserializer = ComboBox(deserializers)
         keyDeserializer.preferredSize = Dimension(40, 24)
         valueDeserializer = ComboBox(deserializers)
         valueDeserializer.preferredSize = Dimension(40, 24)
-        valueDeserializer.selectedIndex = 1
         deserizalizerSubPanel.add(JLabel("Key deserializer"))
         deserizalizerSubPanel.add(keyDeserializer)
         deserizalizerSubPanel.add(JLabel("Value deserializer"))
@@ -63,7 +62,7 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
         certPanel.add(deserizalizerSubPanel, BorderLayout.CENTER)
 
         val methodSubPanel = JPanel(GridLayout(3, 5))
-        radios = arrayOf("Wait for ", "Recent ", "Specific message at ").map{JRadioButton(it)}
+        radios = arrayOf("Wait for ", "Recent ", "Specific message at ").map { JRadioButton(it) }
         methodSubPanel.add(radios[0])
         waitFor = JTextField(1.toString())
         methodSubPanel.add(waitFor)
@@ -73,13 +72,11 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
         methodSubPanel.add(JLabel(" 1s polls"))
         methodSubPanel.add(JLabel(""))
 
-//        (1..3).forEach{methodSubPanel.add(JLabel(""))}
-
         methodSubPanel.add(radios[1])
         decrement = JTextField(1.toString())
         methodSubPanel.add(decrement)
         methodSubPanel.add(JLabel(" messages"))
-        (1..3).forEach{methodSubPanel.add(JLabel(""))}
+        repeat(3) { methodSubPanel.add(JLabel("")) }
         methodSubPanel.add(radios[2])
         partition = JTextField()
         methodSubPanel.add(partition)
@@ -101,38 +98,11 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
 
     fun getKeyDeserializer()= "org.apache.kafka.common.serialization." + keyDeserializer.selectedItem
     fun getValueDeserializer()= "org.apache.kafka.common.serialization." + valueDeserializer.selectedItem
-    fun getDecrement() =
-            if (radios[1].isSelected) {
-                decrement.text.toInt()
-            } else {
-                0
-            }
-
-    fun getPartition() =
-            if (radios[2].isSelected) {
-                partition.text.toInt()
-            } else {
-                0
-            }
-
-    fun getOffset() =
-            if (radios[2].isSelected) {
-                offset.text.toLong()
-            } else {
-                0
-            }
-    fun getWaitFor() =
-            if (radios[0].isSelected) {
-                waitFor.text.toInt()
-            } else {
-                0
-            }
-    fun getPolls() =
-            if (radios[0].isSelected) {
-                polls.text.toInt()
-            } else {
-                0
-            }
+    fun getDecrement() = if (radios[1].isSelected) decrement.text.toInt() else 0
+    fun getPartition() = if (radios[2].isSelected) partition.text.toInt() else 0
+    fun getOffset() = if (radios[2].isSelected) offset.text.toLong() else 0
+    fun getWaitFor() = if (radios[0].isSelected) waitFor.text.toInt() else 0
+    fun getPolls() = if (radios[0].isSelected) polls.text.toInt() else 0
     fun getMode() = if (radios[0].isSelected) 0 else if (radios[1].isSelected) 1 else 2
 }
 
