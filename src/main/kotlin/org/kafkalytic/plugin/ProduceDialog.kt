@@ -8,11 +8,7 @@ import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
-import org.apache.kafka.common.serialization.*
 import java.awt.*
-import java.awt.event.ActionEvent
-import java.io.File
-import java.util.concurrent.CompletableFuture
 import javax.swing.*
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ChangeListener
@@ -24,8 +20,7 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
     private lateinit var file: JTextField
     private lateinit var value: JTextArea
     private lateinit var key: JTextField
-    private lateinit var keySerializer: JComboBox<String>
-    private lateinit var valueSerializer: JComboBox<String>
+    private lateinit var compression: ComboBox<String>
     private lateinit var radios: List<JRadioButton>
     override fun stateChanged(e: ChangeEvent?) {
         file.isEnabled = radios[0].isSelected
@@ -33,55 +28,37 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
     }
 
     init {
-        setTitle("Configure Kafka producer for topic " + topic)
+        setTitle("Configure Kafka producer for topic $topic")
         init()
     }
 
     override fun createCenterPanel(): JPanel {
-        val certPanel = JPanel(BorderLayout())
-
-        val serializers = arrayOf(StringSerializer::class.java,
-                ByteArraySerializer::class.java,
-                IntegerSerializer::class.java,
-                LongSerializer::class.java,
-                DoubleSerializer::class.java).map{ it.simpleName }.toTypedArray()
-        keySerializer = ComboBox(serializers)
-        valueSerializer = ComboBox(serializers)
-
-        val keySubPanel = JPanel(FlowLayout(FlowLayout.LEADING))
         key = JTextField()
         key.preferredSize = Dimension(200, 24)
-        keySubPanel.add(JBLabel("Key "))
-        keySubPanel.add(keySerializer)
-        keySubPanel.add(key)
-        val valueSubPanel = JPanel(BorderLayout())
-        val serializerSubPanel = JPanel(FlowLayout(FlowLayout.LEADING))
-        serializerSubPanel.add(JBLabel("Value"))
-        serializerSubPanel.add(valueSerializer)
-        val loadSubPanel = JPanel(FlowLayout(FlowLayout.LEADING))
-        val textSubPanel = JPanel(FlowLayout(FlowLayout.LEADING))
-        radios = arrayOf("Load from file ", "Text ").map{ JRadioButton(it) }
-        loadSubPanel.add(radios[0])
+
+        radios = arrayOf("Load from file ", "Text ").map { JRadioButton(it) }
+
+        value = JTextArea(10, 43)
+        value.lineWrap = true
+
         file = JTextField()
         file.preferredSize = Dimension(200, 24)
-        loadSubPanel.add(file)
         val browse = JButton("Browse")
         browse.addActionListener{
             val fcd = FileChooserDescriptor(true, false, false, false, false, false)
             file.text = FileChooser.chooseFile(fcd, project, null)?.canonicalPath
         }
 
-        loadSubPanel.add(browse)
-        textSubPanel.add(radios[1])
-        value = JTextArea(10, 43)
-        value.lineWrap = true
-        val jScrollPane1 = JBScrollPane(value)
-        textSubPanel.add(jScrollPane1)
-        certPanel.add(keySubPanel, BorderLayout.NORTH)
-        certPanel.add(valueSubPanel, BorderLayout.CENTER)
-        valueSubPanel.add(serializerSubPanel, BorderLayout.NORTH)
-        valueSubPanel.add(loadSubPanel, BorderLayout.CENTER)
-        valueSubPanel.add(textSubPanel, BorderLayout.SOUTH)
+        compression = ComboBox(arrayOf("none", "gzip", "snappy", "lz4", "zstd"))
+
+        val panel = JPanel(BorderLayout())
+        panel.add(layoutLR(JBLabel("Key "), key), BorderLayout.NORTH)
+        panel.add(JBLabel("Value"), BorderLayout.CENTER)
+        panel.add(layoutUD(
+            layoutLR(radios[1], JBScrollPane(value)),
+            layoutLR(radios[0], layoutLR(file, browse)),
+            layoutLR(JBLabel("Compression"), compression)), BorderLayout.SOUTH)
+
         val radioGroup = ButtonGroup()
         radios.forEach {
             radioGroup.add(it)
@@ -90,11 +67,29 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
         radios[1].isSelected = true
         stateChanged(null)
 
-        return certPanel
+        return panel
+    }
+
+    private fun layoutLR(left: JComponent, right: JComponent) : JPanel {
+        val panel = JPanel(BorderLayout())
+        panel.add(left, BorderLayout.WEST)
+        if (right != null) {
+            panel.add(right, BorderLayout.CENTER)
+        }
+        return panel
+    }
+
+    private fun layoutUD(top: JComponent, center: JComponent, bottom: JComponent) : JPanel {
+        val panel = JPanel(BorderLayout())
+        panel.add(top, BorderLayout.NORTH)
+        panel.add(center, BorderLayout.CENTER)
+        panel.add(bottom, BorderLayout.SOUTH)
+        return panel
     }
 
     fun getKey() = key.text
     fun getFile() = file.text
     fun getText() = value.text
     fun getMode() = radios[0].isSelected
+    fun getCompression() = compression.selectedItem.toString()
 }
