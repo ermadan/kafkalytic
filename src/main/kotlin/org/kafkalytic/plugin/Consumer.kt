@@ -37,7 +37,7 @@ class Consumer(project: Project, val topic: String, val props: Properties, val d
             }
             1 -> {
                 consumer.subscribe(listOf(topic))
-                consumer.poll(Duration.ofSeconds(1))
+                consumer.poll(Duration.ofSeconds(10))
                 val assignments = consumer.assignment()
                 val endOffsets = consumer.endOffsets(assignments)
                 LOG.info("Iterating partitions with offsets $endOffsets")
@@ -60,8 +60,8 @@ class Consumer(project: Project, val topic: String, val props: Properties, val d
 
     protected fun consume(consumer: KafkaConsumer<Any, Any>, howMany : Int, polls: Int = 5) {
         var consumed = 0
-        (0..polls).forEach { _ ->
-            val records = consumer.poll(Duration.ofSeconds(1)) as ConsumerRecords<Any, Any>
+        repeat(polls) { _ ->
+            val records = consumer.poll(Duration.ofSeconds(3)) as ConsumerRecords<Any, Any>
             // Handle new records
             LOG.info("polling:" + records.count())
             records.forEach {
