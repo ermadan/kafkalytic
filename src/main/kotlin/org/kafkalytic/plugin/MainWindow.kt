@@ -145,10 +145,12 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
                                     }
                                     val producer = Producer(project, last.getTopicName(),
                                             last.cluster.getClusterProperties(),
-                                            dialog.getKey(), value)
-                                    background("Publish") { producer.run() }
-//                                    ProgressManager.getInstance().runProcessWithProgressAsynchronously(
-//                                            producer, BackgroundableProcessIndicator(producer))
+                                            dialog.getKey(), value, dialog.getCompression())
+                                    background("Publish") {
+                                        producer.run()
+                                        last.refresh()
+                                        foreground { treeModel.reload(last) }
+                                    }
                                 }
                             }
                             menu.add("Change partitions number ") {
@@ -158,7 +160,7 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
                                     background("Change partitions number") {
                                         last.setPartitions(partitions.toInt())
                                         last.refresh()
-                                        treeModel.reload(last)
+                                        foreground { treeModel.reload(last) }
                                     }
                                 }
                             }
@@ -176,7 +178,7 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
                                         clusterNode.createTopic(dialog.getTopic(), dialog.getPartitions(), dialog.getReplications())
                                         info("topic " + dialog.getTopic() + "was created.")
                                         clusterNode.topics.refresh()
-                                        treeModel.reload(clusterNode.topics)
+                                        foreground { treeModel.reload(clusterNode.topics) }
                                     }
                                 }
                             }
@@ -293,7 +295,7 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
     }
 
     private fun addCluster() {
-        val dialog = CreateClusterDialog()
+        val dialog = CreateClusterDialog(project)
         dialog.show()
         if (dialog.exitCode == Messages.OK) {
             background("Adding Kafka cluster " + dialog.inputString) {
