@@ -10,10 +10,10 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 class KafkaStateComponent : PersistentStateComponent<KafkaStateComponent> {
     private val LOG = Logger.getInstance("KafkaStateComponent")
 
-    var clusters : MutableMap<String, MutableMap<String, String>>? = null
+    var clusters : MutableMap<String, Map<String, String>>? = null
     var cluster : Map<String, String>? = null
 
-    fun addCluster(c: MutableMap<String, String>) {
+    fun addCluster(c: Map<String, String>) {
         if (clusters == null) {
             clusters = mutableMapOf()
         }

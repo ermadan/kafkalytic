@@ -1,16 +1,21 @@
 package org.kafkalytic.plugin
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.InputValidator
 import com.intellij.openapi.ui.Messages
+import com.intellij.ui.table.JBTable
 import java.awt.BorderLayout
-import java.awt.Color
-import java.awt.GridLayout
+import java.io.FileReader
+import java.util.*
 import javax.swing.*
-import javax.swing.event.ChangeEvent
-import javax.swing.event.ChangeListener
+import javax.swing.event.TableModelEvent
+import javax.swing.event.TableModelListener
+import javax.swing.table.DefaultTableModel
 
-class CreateClusterDialog() : Messages.InputDialog(
+class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         "Enter Kafka bootstrap server as host:port",
         "New cluster",
         Messages.getQuestionIcon(),
@@ -20,30 +25,10 @@ class CreateClusterDialog() : Messages.InputDialog(
             private val matcher = """([a-zA-Z0-9.-]+:[0-9]{1,5},)*([a-zA-Z0-9-]+\.)*([a-zA-Z0-9-])+:[0-9]{1,5}""".toRegex()
             override fun checkInput(inputString: String?) = inputString != null && matcher.matches(inputString)
             override fun canClose(inputString: String?) = checkInput(inputString)
-        }), ChangeListener {
+        }) {
 
     private val LOG = Logger.getInstance(this::class.java)
-    private lateinit var trustPath: JTextField
-    private lateinit var keyPath: JTextField
-    private lateinit var trustPassword: JTextField
-    private lateinit var keyPassword: JTextField
-    private lateinit var saslUser: JTextField
-    private lateinit var saslPassword: JTextField
-    private lateinit var radioNoAuth: JRadioButton
-    private lateinit var radioCertAuth: JRadioButton
-    private lateinit var radioSASLAuth: JRadioButton
-
-    override fun stateChanged(e: ChangeEvent?) {
-        saslUser.isEnabled = radioSASLAuth.isSelected
-        saslPassword.isEnabled = radioSASLAuth.isSelected
-
-        trustPath.isEnabled = radioCertAuth.isSelected
-        keyPath.isEnabled = radioCertAuth.isSelected
-        trustPassword.isEnabled = radioCertAuth.isSelected
-        keyPassword.isEnabled = radioCertAuth.isSelected
-
-        LOG.info("radios:" + radioCertAuth.isSelected + ":" + radioSASLAuth.isSelected)
-    }
+    private lateinit var tableModel: DefaultTableModel
 
     override fun createMessagePanel(): JPanel {
         val messagePanel = JPanel(BorderLayout())
@@ -52,78 +37,38 @@ class CreateClusterDialog() : Messages.InputDialog(
             messagePanel.add(textComponent, BorderLayout.NORTH)
         }
 
+        tableModel = DefaultTableModel()
+        tableModel.addColumn("Property")
+        tableModel.addColumn("Value")
+        tableModel.addTableModelListener {  }
         myField = createTextFieldComponent()
         messagePanel.add(createScrollableTextComponent(), BorderLayout.CENTER)
-
-        val certPanel = JPanel(BorderLayout())
-
-        trustPath = JTextField()
-        keyPath = JTextField()
-        trustPassword = JTextField()
-        keyPassword = JTextField()
-        saslUser = JTextField()
-        saslPassword = JTextField()
-        radioNoAuth = JRadioButton("No Auth")
-        radioCertAuth = JRadioButton("Certificate Auth")
-        radioSASLAuth = JRadioButton("SASL Auth")
-        val radioGroup = ButtonGroup()
-        radioGroup.add(radioNoAuth)
-        radioGroup.add(radioCertAuth)
-        radioGroup.add(radioSASLAuth)
-        radioNoAuth.addChangeListener(this)
-        radioCertAuth.addChangeListener(this)
-        radioSASLAuth.addChangeListener(this)
-
-        val certSubPanel = JPanel(GridLayout(0, 2))
-        certSubPanel.add(radioNoAuth)
-        certSubPanel.add(JLabel(""))
-        certSubPanel.add(radioCertAuth)
-        certSubPanel.add(JLabel(""))
-        certSubPanel.add(JLabel("Truststore path"))
-        certSubPanel.add(trustPath)
-        certSubPanel.add(JLabel("Truststore password"))
-        certSubPanel.add(trustPassword)
-        certSubPanel.add(JLabel("Keystore path"))
-        certSubPanel.add(keyPath)
-        certSubPanel.add(JLabel("Keystore password"))
-        certSubPanel.add(keyPassword)
-        certPanel.add(certSubPanel, BorderLayout.CENTER)
-
-        val saslSubPanel = JPanel(GridLayout(0, 2))
-        saslSubPanel.add(radioSASLAuth)
-        saslSubPanel.add(JLabel(""))
-        saslSubPanel.add(JLabel("SASL username"))
-        saslSubPanel.add(saslUser)
-        saslSubPanel.add(JLabel("SASL password"))
-        saslSubPanel.add(saslPassword)
-        certPanel.add(saslSubPanel, BorderLayout.SOUTH)
-
-        messagePanel.add(certPanel, BorderLayout.SOUTH)
-        radioNoAuth.isSelected = true
-
+        val browse = JButton("Load properties from file")
+        browse.addActionListener {
+            val fcd = FileChooserDescriptor(true, false, false, false, false, false)
+            val props = Properties()
+            props.load(FileReader(FileChooser.chooseFile(fcd, project, null)?.canonicalPath))
+            props.entries.forEach { tableModel.addRow(arrayOf(it.key, it.value)) }
+            if (props.containsKey("bootstrap.servers")) {
+                myField.text = props.getProperty("bootstrap.servers")
+            }
+        }
+        val subPanel = JPanel(BorderLayout())
+        subPanel.add(browse, BorderLayout.NORTH)
+        subPanel.add(JBTable(tableModel), BorderLayout.CENTER)
+        messagePanel.add(subPanel, BorderLayout.SOUTH)
         return messagePanel
     }
 
-    fun getCluster(): MutableMap<String, String> {
-        val props = hashMapOf("bootstrap.servers" to inputString!!)
-        if (radioCertAuth.isSelected) {
-            props.putAll(mapOf(
-                    "security.protocol" to "SSL",
-                    "ssl.truststore.location" to trustPath.text,
-                    "ssl.truststore.password" to trustPassword.text,
-                    "ssl.keystore.location" to keyPath.text,
-                    "ssl.keystore.password" to keyPassword.text))
-        }
-        if (radioCertAuth.isSelected) {
-            props.putAll(mapOf(
-                    "sasl.mechanism" to "PLAIN",
-                    "security.protocol" to "SASL_SSL",
-                    "sasl.jaas.config" to "org.apache.kafka.common.security.plain.PlainLoginModule required  username=\""
-                            + saslUser + "\" password=\"" + saslPassword + "\""
-            ))
+    fun getCluster(): Map<String, String> {
+        var props = tableModel.dataVector.elements().asSequence().map { val v = it as Vector<*>; v[0].toString() to v[1].toString() }.toMap()
+        if (!inputString.isNullOrEmpty()) {
+            props = props.toMutableMap()
+            props.put("bootstrap.servers", inputString.toString())
         }
         LOG.info("coonection properties:" + props)
         return props
     }
 }
+
 
