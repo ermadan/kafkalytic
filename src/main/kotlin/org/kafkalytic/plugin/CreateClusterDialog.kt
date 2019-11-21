@@ -16,7 +16,7 @@ import javax.swing.event.TableModelListener
 import javax.swing.table.DefaultTableModel
 
 class CreateClusterDialog(val project: Project) : Messages.InputDialog(
-        "Enter Kafka bootstrap server as host:port",
+        "Enter Kafka bootstrap servers as host:port,host2:port",
         "New cluster",
         Messages.getQuestionIcon(),
         null,
@@ -28,6 +28,7 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         }) {
 
     private val LOG = Logger.getInstance(this::class.java)
+    private lateinit var name: JTextField
     private lateinit var tableModel: DefaultTableModel
 
     override fun createMessagePanel(): JPanel {
@@ -53,20 +54,24 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
                 myField.text = props.getProperty("bootstrap.servers")
             }
         }
+        name = JTextField()
         val subPanel = JPanel(BorderLayout())
-        subPanel.add(browse, BorderLayout.NORTH)
-        subPanel.add(JBTable(tableModel), BorderLayout.CENTER)
+        subPanel.add(layoutLR(JLabel("Cluster name (optional)"), name), BorderLayout.NORTH)
+        subPanel.add(browse, BorderLayout.CENTER)
+        subPanel.add(JBTable(tableModel), BorderLayout.SOUTH)
         messagePanel.add(subPanel, BorderLayout.SOUTH)
         return messagePanel
     }
 
-    fun getCluster(): Map<String, String> {
-        var props = tableModel.dataVector.elements().asSequence().map { val v = it as Vector<*>; v[0].toString() to v[1].toString() }.toMap()
+    fun getCluster(): MutableMap<String, String> {
+        var props = tableModel.dataVector.elements().asSequence()
+                .map { val v = it as Vector<*>; v[0].toString() to v[1].toString() }.toMap().toMutableMap()
         if (!inputString.isNullOrEmpty()) {
-            props = props.toMutableMap()
             props.put("bootstrap.servers", inputString.toString())
         }
-        LOG.info("coonection properties:" + props)
+        props.put("name", name.text.ifBlank { props["bootstrap.servers"]!! })
+        props.put("request.timeout.ms", "100")
+        LOG.info("coonection properties:$props")
         return props
     }
 }

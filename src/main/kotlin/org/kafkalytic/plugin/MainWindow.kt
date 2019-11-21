@@ -24,9 +24,7 @@ import java.io.File
 import java.util.*
 import java.util.regex.Pattern
 import javax.swing.*
-import javax.swing.event.DocumentEvent
-import javax.swing.event.TreeExpansionEvent
-import javax.swing.event.TreeExpansionListener
+import javax.swing.event.*
 import javax.swing.tree.*
 
 class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel(BorderLayout()) {
@@ -43,7 +41,7 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
     private val refreshButton by lazy {RefreshAction()}
     private val config = stateComponent
     private val project = project
-    val taskQueue = BackgroundTaskQueue(project, "Kafkalytic queque")
+    private val taskQueue = BackgroundTaskQueue(project, "Kafkalytic queue")
 
     init {
         LOG.info("Main window created")
@@ -52,13 +50,16 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
 
         val panel = JSplitPane(JSplitPane.VERTICAL_SPLIT)
 
-        config.clusters?.forEach{LOG.info("init node:$it");zRoot.add(KRootTreeNode(it.value))}
+        config.clusters?.forEach { LOG.info("init node:$it"); zRoot.add(KRootTreeNode(it.value)) }
         tree.expandPath(TreePath(zRoot))
 
         tree.addTreeSelectionListener {
             val node = it?.newLeadSelectionPath?.lastPathComponent
             LOG.info("selection changed:$node")
             if (node != null) {
+                if (node is KRootTreeNode) {
+                    tableModel.updateDetails(node as DefaultMutableTreeNode)
+                }
                 background("Loading properties") {
                     if (node is KafkaNode) {
                         node.expand()
@@ -94,7 +95,7 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
                             val parent = (paths.first().path[1] as KRootTreeNode).topics
                             tree.selectionModel.selectionPaths = parent.children().asSequence()
                                     .filter { Pattern.matches(pattern, (it as DefaultMutableTreeNode).userObject.toString()) }
-                                    .map{ TreePath((tree.model as DefaultTreeModel).getPathToRoot(it as TreeNode)) }
+                                    .map { TreePath((tree.model as DefaultTreeModel).getPathToRoot(it as TreeNode)) }
                                     .toList()
                                     .toTypedArray()
                             info(tree.selectionModel.selectionPaths.size.toString() + " topics were selected.")
@@ -184,7 +185,7 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
                             }
                         }
                         if (last is KRootTreeNode) {
-                            menu.add("Remove cluster " + last.toString()) { removeCluster() }
+                            menu.add("Remove cluster $last") { removeCluster() }
                         }
                     }
                     menu.show(tree, e.x, e.y)
@@ -211,6 +212,27 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
         val details = JBTable(tableModel)
         details.fillsViewportHeight = false
         details.setShowColumns(true)
+        tableModel.addEditListener { key, value ->
+            if (tableModel.currentNode is KRootTreeNode) {
+                val clusterConfig = (tableModel.currentNode as KRootTreeNode).getClusterProperties()
+                val clusterName = clusterConfig["name"] as String
+                if (key == "name") {
+                    config.clusters.remove(clusterName)
+                    config.clusters[value] = clusterConfig
+                }
+                with (clusterConfig) {
+                    if (key.startsWith("Broker ")) {
+                        val bootstrap = tableModel.dataVector.elements().asSequence()
+                                .mapNotNull { val v = it as Vector<*>; if (v[0].toString().startsWith("Broker ")) v[1].toString() else null }.joinToString (",")
+                        this.put("bootstrap.servers", bootstrap)
+                        (tableModel.currentNode as KRootTreeNode).resetConnection()
+                    } else {
+                        this.put(key, value)
+                    }
+                }
+                treeModel.reload(tableModel.currentNode)
+            }
+        }
 
         panel.topComponent = JBScrollPane(tree)
         panel.bottomComponent = JBScrollPane(details)
@@ -246,6 +268,7 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
                         "Kafka", Messages.getQuestionIcon())) {
             zRoot.remove(clusterNode)
             treeModel.reload(zRoot)
+            tableModel.updateDetails(null)
             config.removeCluster(clusterNode.userObject as Map<String, String>)
         }
     }
@@ -347,19 +370,6 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
     }
 
 
-    private fun error(message: String, e: Throwable?) {
-        LOG.error(message, e)
-        ApplicationManager.getApplication().invokeLater { Messages.showErrorDialog(message + e.toString(), "Kafka") }
-    }
-
-    private fun info(message: String) {
-        LOG.info(message)
-        ApplicationManager.getApplication().invokeLater{ Messages.showInfoMessage(message, "Kafka") }
-    }
-
-    fun foreground(task: () -> Unit) {
-        ApplicationManager.getApplication().invokeLater(task)
-    }
 
     fun background(title: String, task: () -> Unit) {
         background(project, title, task)
@@ -375,4 +385,19 @@ class MainWindow(stateComponent: KafkaStateComponent, project: Project) : JPanel
         })
     }
 }
+
+fun foreground(task: () -> Unit) {
+    ApplicationManager.getApplication().invokeLater(task)
+}
+
+fun error(message: String, e: Throwable?) {
+    LOG.error(message, e)
+    foreground { Messages.showErrorDialog(message + e.toString(), "Kafka") }
+}
+
+fun info(message: String) {
+    LOG.info(message)
+    foreground { Messages.showInfoMessage(message, "Kafka") }
+}
+
 

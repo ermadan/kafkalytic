@@ -18,7 +18,7 @@ apply plugin: 'org.jetbrains.intellij'
 apply plugin: 'java'
 
 group 'org.ermadan'
-version '0.7'
+version '0.8.2'
 
 apply plugin: 'kotlin'
 
@@ -47,5 +47,6 @@ intellij {
 }
 patchPluginXml {
     changeNotes """
-      multiple bugfixes"""
+        Implemented toolbar search 
+        fixed bug with node instance"""
 }

@@ -70,23 +70,6 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
         return panel
     }
 
-    private fun layoutLR(left: JComponent, right: JComponent) : JPanel {
-        val panel = JPanel(BorderLayout())
-        panel.add(left, BorderLayout.WEST)
-        if (right != null) {
-            panel.add(right, BorderLayout.CENTER)
-        }
-        return panel
-    }
-
-    private fun layoutUD(top: JComponent, center: JComponent, bottom: JComponent) : JPanel {
-        val panel = JPanel(BorderLayout())
-        panel.add(top, BorderLayout.NORTH)
-        panel.add(center, BorderLayout.CENTER)
-        panel.add(bottom, BorderLayout.SOUTH)
-        return panel
-    }
-
     fun getKey() = key.text
     fun getFile() = file.text
     fun getText() = value.text

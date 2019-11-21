@@ -13,12 +13,12 @@ import org.apache.kafka.common.TopicPartition
 import java.time.Duration
 import java.util.*
 
-class Consumer(project: Project, val topic: String, val props: Properties, val dialog: ConsumeDialog)
+class Consumer(project: Project, val topic: String, val props: Map<String, String>, val dialog: ConsumeDialog)
     : Task.Backgroundable(project, "Consume from $topic", true) {
     private val LOG = Logger.getInstance(this::class.java)
 
     override fun run(indicator: ProgressIndicator) {
-        val local = props.clone() as Properties
+        val local = props.toProperties()
 
         local.put("group.id", "test")
         local.put("enable.auto.commit", "false")
