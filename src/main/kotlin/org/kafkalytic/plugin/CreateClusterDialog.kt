@@ -8,6 +8,7 @@ import com.intellij.openapi.ui.InputValidator
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.table.JBTable
 import java.awt.BorderLayout
+import java.awt.GridLayout
 import java.io.FileReader
 import java.util.*
 import javax.swing.*
@@ -30,6 +31,12 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
     private val LOG = Logger.getInstance(this::class.java)
     private lateinit var name: JTextField
     private lateinit var tableModel: DefaultTableModel
+    private lateinit var trustPath: JTextField
+    private lateinit var keyPath: JTextField
+    private lateinit var trustPassword: JTextField
+    private lateinit var keyPassword: JTextField
+    private lateinit var requestTimeout: JTextField
+
 
     override fun createMessagePanel(): JPanel {
         val messagePanel = JPanel(BorderLayout())
@@ -48,17 +55,39 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         browse.addActionListener {
             val fcd = FileChooserDescriptor(true, false, false, false, false, false)
             val props = Properties()
-            props.load(FileReader(FileChooser.chooseFile(fcd, project, null)?.canonicalPath))
-            props.entries.forEach { tableModel.addRow(arrayOf(it.key, it.value)) }
-            if (props.containsKey("bootstrap.servers")) {
-                myField.text = props.getProperty("bootstrap.servers")
+            val file = FileChooser.chooseFile(fcd, project, null)
+            if (file != null) {
+                props.load(FileReader(file.canonicalPath))
+                props.entries.forEach { tableModel.addRow(arrayOf(it.key, it.value)) }
+                props.getProperty("bootstrap.servers")?.let { myField.text = it }
+                props.getProperty("ssl.truststore.location")?.let { trustPath.text = it }
+                props.getProperty("ssl.truststore.password")?.let { trustPassword.text = it }
+                props.getProperty("ssl.keystore.location")?.let { keyPath.text = it }
+                props.getProperty("ssl.keystore.password")?.let { keyPassword.text = it }
             }
         }
         name = JTextField()
         val subPanel = JPanel(BorderLayout())
         subPanel.add(layoutLR(JLabel("Cluster name (optional)"), name), BorderLayout.NORTH)
-        subPanel.add(browse, BorderLayout.CENTER)
-        subPanel.add(JBTable(tableModel), BorderLayout.SOUTH)
+        val certSubPanel = JPanel(GridLayout(0, 2))
+        trustPath = JTextField()
+        keyPath = JTextField()
+        trustPassword = JTextField()
+        keyPassword = JTextField()
+        requestTimeout = JTextField("5000")
+        certSubPanel.add(JLabel("Truststore path"))
+        certSubPanel.add(trustPath)
+        certSubPanel.add(JLabel("Truststore password"))
+        certSubPanel.add(trustPassword)
+        certSubPanel.add(JLabel("Keystore path"))
+        certSubPanel.add(keyPath)
+        certSubPanel.add(JLabel("Keystore password"))
+        certSubPanel.add(keyPassword)
+        certSubPanel.add(JLabel("Request timeout, ms"))
+        certSubPanel.add(requestTimeout)
+        subPanel.add(certSubPanel, BorderLayout.CENTER)
+        subPanel.add(layoutUD(browse, JBTable(tableModel)), BorderLayout.SOUTH)
+
         messagePanel.add(subPanel, BorderLayout.SOUTH)
         return messagePanel
     }
@@ -70,7 +99,18 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
             props.put("bootstrap.servers", inputString.toString())
         }
         props.put("name", name.text.ifBlank { props["bootstrap.servers"]!! })
-        props.put("request.timeout.ms", "100")
+        if (requestTimeout.text.isNotBlank()) {
+            props.put("request.timeout.ms", requestTimeout.text)
+        }
+        if (trustPath.text.isNotBlank()) {
+            props.putAll(mapOf(
+                    "security.protocol" to "SSL",
+                    "ssl.truststore.location" to trustPath.text,
+                    "ssl.truststore.password" to trustPassword.text,
+                    "ssl.keystore.location" to keyPath.text,
+                    "ssl.keystore.password" to keyPassword.text))
+        }
+
         LOG.info("coonection properties:$props")
         return props
     }

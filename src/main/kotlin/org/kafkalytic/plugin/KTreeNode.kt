@@ -1,11 +1,13 @@
 package org.kafkalytic.plugin
 
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.util.containers.isNullOrEmpty
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.admin.NewPartitions
 import org.apache.kafka.clients.admin.NewTopic
+import org.apache.kafka.clients.admin.RecordsToDelete
 import org.apache.kafka.common.KafkaException
+import org.apache.kafka.common.TopicPartition
+import java.util.concurrent.ExecutionException
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.MutableTreeNode
 
@@ -14,12 +16,8 @@ const val TOPICS = "Topics"
 const val CONSUMERS = "Consumers"
 
 interface KafkaTableNode {
-    fun headers() : List<String> {
-        return emptyList()
-    }
-    fun rows() : List<Array<String>> {
-        return emptyList()
-    }
+    fun headers() = emptyList<String>()
+    fun rows() = emptyList<Array<String>>()
 }
 
 interface KafkaNode : MutableTreeNode, KafkaTableNode {
@@ -27,125 +25,61 @@ interface KafkaNode : MutableTreeNode, KafkaTableNode {
     fun expand()
 }
 
-class KRootTreeNode(userObject: MutableMap<String, String>) : DefaultMutableTreeNode(userObject), KafkaNode {
-    private val brokers by lazy {
-        object : DefaultMutableTreeNode(BROKERS), KafkaNode {
-            override fun refresh() {
-                removeAllChildren()
-                expand()
-            }
-
-            override fun expand() {
-                LOG.info("Expand brokers")
-                if (childCount == 0) {
-                    client?.describeCluster()?.nodes()?.get()?.forEach {
-                        add(DefaultMutableTreeNode(it.idString() + " (" + it.host() + ":" + it.port() + ")"))
-                        LOG.info("  broker found " + it.idString())
-                    }
-                    LOG.info("Expand brokers complete")
-                } else {
-                    LOG.info("Brokers already expanded.")
-                }
-            }
-        }
-    }
-    private val consumers by lazy {
-        object : DefaultMutableTreeNode(CONSUMERS), KafkaNode {
-            override fun refresh() {
-                consumers_ = null
-                removeAllChildren()
-                expand()
-            }
-
-            var consumers_: List<String>? = null
-
-            fun getConsumers(): List<String> {
-                if (consumers_.isNullOrEmpty()) {
-                    consumers_ = client?.listConsumerGroups()?.all()?.get()?.map { it.groupId() }
-                }
-                return consumers_!!
-            }
-
-            override fun expand() {
-                LOG.info("Expand consumers")
-                if (childCount == 0) {
-                    getConsumers().forEach {
-                        add(object : DefaultMutableTreeNode(it), KafkaTableNode {
-                            override fun rows(): List<Array<String>> {
-                                client?.listConsumerGroupOffsets(getUserObject() as String)
-                                        ?.partitionsToOffsetAndMetadata().get().entries
-                                        ?.forEach { (k, v) ->
-                                            arrayOf(k.partition().toString(), v.offset().toString(), v.metadata())
-                                        }
-                                return emptyList()
-                            }
-
-                            override fun headers(): List<String> {
-                                return listOf("Partition", "Offset", "Metadata")
-                            }
-                        })
-                    }
-                    LOG.info("Expand consumers complete")
-                } else {
-                    LOG.info("consumers already expanded.")
-                }
-            }
-
-            override fun headers(): List<String> {
-                return emptyList()
-            }
-
-            override fun rows(): List<Array<String>> {
-                return emptyList()
-            }
-        }
-    }
-    val topics: KafkaNode by lazy {
-        object : DefaultMutableTreeNode(TOPICS), KafkaNode {
-            override fun refresh() {
-                removeAllChildren()
-                expand()
-            }
-
-            override fun expand() {
-                LOG.info("Expand topics")
-                if (childCount == 0) {
-                    val names = client?.listTopics()?.listings()?.get()?.filter { !it.isInternal }?.map { it.name() }?.sorted()
-                    names?.forEach {
-                        add(KTopicTreeNode(it, this@KRootTreeNode))
-                        LOG.info("  topic found $it")
-                    }
-                    LOG.info("Expand topics complete" + client?.describeTopics(names)?.all()?.get())
-                }
-            }
-        }
-    }
+abstract class KafkaTreeNode(userObject: Any) : DefaultMutableTreeNode(userObject), KafkaTableNode, KafkaNode {
+    private val loadingNode = DefaultMutableTreeNode("loading...")
 
     init {
-        add(brokers)
-        add(topics)
-        add(consumers)
+        add(loadingNode)
     }
 
-    private var _client: AdminClient? = null
-    val client: AdminClient?
-        get() {
-            if (_client == null) {
-                LOG.info("Creating client with " + getClusterProperties())
+    override fun refresh() {
+        removeAllChildren()
+        add(loadingNode)
+        expand()
+    }
+
+    private fun getKafkaRoot(): KRootTreeNode {
+        var ancestor: DefaultMutableTreeNode? = this
+        while (ancestor !is KRootTreeNode) {
+            ancestor = ancestor?.parent as DefaultMutableTreeNode?
+        }
+        return ancestor
+    }
+
+    override fun expand() {
+        LOG.info("Expand $this")
+        if (childCount > 0 && getChildAt(0) == loadingNode ) {
+            getKafkaRoot().client?.let {
                 try {
-                    _client = AdminClient.create(getClusterProperties().toMap())
-                } catch (e: KafkaException) {
-                    error("Cannot connect to the Kafka cluster ${getClusterProperties()["bootstrap.serverswa"]}", e)
+                    readChildren(it).let {
+                        removeAllChildren()
+                        it.forEach { c -> add(c) }
+                    }
+                } catch (e: ExecutionException) {
+                    error("" + e.message, e)
                 }
             }
-            return _client
         }
-
-    fun resetConnection() {
-        _client = null
+        LOG.info("Expand complete $this")
     }
 
-    fun getClusterProperties() = userObject as MutableMap<String, String>
+    abstract fun readChildren(client: AdminClient) : List<DefaultMutableTreeNode>
+}
+
+class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTreeNode(clusterProperties) {
+    var client: AdminClient? = null
+
+    override fun expand() {
+        if (client == null) {
+            LOG.info("Creating client with $clusterProperties")
+            try {
+                client = AdminClient.create(clusterProperties as Map<String, Any>)
+            } catch (e: KafkaException) {
+                error("Cannot connect to Kafka cluster ${clusterProperties["bootstrap.servers"]}", e)
+            }
+        }
+        super.expand()
+    }
 
     fun createTopic(name: String, partitions: Int, replications: Short) {
         LOG.info("Creating topic $name")
@@ -156,84 +90,108 @@ class KRootTreeNode(userObject: MutableMap<String, String>) : DefaultMutableTree
     override fun headers() = listOf("Property", "Value")
 
     override fun rows() =
-        getClusterProperties().filter { (k, _) -> k != "bootstrap.servers"}.map { (k, v) -> arrayOf(k, v)}
+            (clusterProperties).filter { (k, _) -> k != "bootstrap.servers"}.map { (k, v) -> arrayOf(k, v)}
                 .toMutableList().also {
-                    it.addAll(getClusterProperties()["bootstrap.servers"]
+                    it.addAll(clusterProperties["bootstrap.servers"]
                         .toString()
                         .split(",")
                         .mapIndexed { index, broker -> arrayOf("Broker $index", broker) }) }
 
     override fun refresh() {
-        brokers.refresh()
-        topics.refresh()
+        if (client != null) {
+            client!!.close()
+        }
+        client = null
+        super.refresh()
     }
 
-    override fun expand() {
-        brokers.expand()
-        topics.expand()
-        consumers.expand()
-    }
+    override fun readChildren(client: AdminClient) = listOf(
+        object : KafkaTreeNode(BROKERS) {
+            override fun readChildren(client: AdminClient) =
+                client.describeCluster().nodes().get().map {
+                    DefaultMutableTreeNode(it.idString() + " (" + it.host() + ":" + it.port() + ")")
+                }
+        },
+        object : KafkaTreeNode(CONSUMERS) {
+            override fun readChildren(client: AdminClient) =
+                client.listConsumerGroups().all().get().map { it.groupId() }.map {
+                    object : DefaultMutableTreeNode(it), KafkaTableNode {
+                        override fun rows(): List<Array<String>> =
+                            client.listConsumerGroupOffsets(getUserObject() as String)
+                                .partitionsToOffsetAndMetadata().get().entries
+                                .map { (k, v) ->
+                                    arrayOf(k.toString(), v.offset().toString(), v.metadata())
+                                }
+                        override fun headers() = listOf("Partition", "Offset", "Metadata")
+                    }
+                }
+        },
+        object : KafkaTreeNode(TOPICS) {
+            override fun readChildren(client: AdminClient) =
+                client.listTopics().listings().get().filter { !it.isInternal }.map { it.name() }.sorted()
+                    .map {
+                        KTopicTreeNode(it, this@KRootTreeNode)
+                    }
+        }
+    )
+
+    fun getTopics() = children.map {it as KafkaTreeNode}.find {it.userObject == TOPICS}!!
 
     fun delete(names: Collection<String>) {
-        client?.deleteTopics(names)?.all()?.get()
-        topics.refresh()
+        client?.let { it.deleteTopics(names).all().get() }
+        getTopics()?.refresh()
     }
 
-    override fun toString() =
-            (getClusterProperties()["name"] ?: getClusterProperties()["bootstrap.servers"]) as String
+    override fun toString() = (clusterProperties["name"] ?: clusterProperties["bootstrap.servers"]) as String
 }
 
 val LOG = Logger.getInstance("Kafkalytic")
-
 class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMutableTreeNode(topicName), KafkaNode {
-    init {
-        add(DefaultMutableTreeNode("loading..."))
-    }
-
     val cluster = clusterNode
-    private var offsets_ : Collection<Pair<Int, Long>>? = null
+    private var offsets : Collection<Pair<Int, Long>>? = null
 
-    private fun getOffsets() : Collection<Pair<Int, Long>> {
-        if (offsets_ == null) {
-            offsets_ = getOffsets(cluster.getClusterProperties().toProperties(), getTopicName())
-        }
-        return offsets_!!
-    }
     fun getTopicName() = userObject as String
-    fun getPartitions() = cluster.client.let { if (it == null) emptyList() else it.describeTopics(listOf(getTopicName())).all().get().values.first().partitions()}
+    fun getPartitions() = cluster.client.let {
+        if (it == null) emptyList() else it.describeTopics(listOf(getTopicName())).all().get().values.first().partitions()
+    }
+
+    fun deleteRecords(offset: Long) {
+        cluster.client?.deleteRecords(getPartitions().map {
+            TopicPartition(getTopicName(), it.partition()) to RecordsToDelete.beforeOffset(offset)
+        }.toMap())
+        LOG.info("Removed records before $offset for topic ${getTopicName()}")
+    }
+
     fun setPartitions(partitions: Int) {
         cluster.client?.createPartitions(mapOf(getTopicName() to NewPartitions.increaseTo(partitions)))
-        LOG.info("Partitions for topic " + getTopicName() + " changed to " + partitions)
+        LOG.info("Partitions for topic ${getTopicName()} changed to $partitions")
     }
 
     override fun refresh() {
-        LOG.info("Refresh partitions")
-        offsets_ = null
-        getOffsets()
-        removeAllChildren()
-        getOffsets().forEach{ add(KPartitionTreeNode(it.first, it.second)) }
+        LOG.info("topic ${getTopicName()} refresh")
+        offsets = loadOffsets(cluster.clusterProperties.toMutableMap(), getTopicName())
     }
 
     override fun expand() {
-        LOG.info("Expand partitions")
-        if (getChildAt(0) !is KPartitionTreeNode) {
-            removeAllChildren()
-            getOffsets().forEach{ add(KPartitionTreeNode(it.first, it.second)) }
+        LOG.info("topic ${getTopicName()} expand")
+        if (offsets == null) {
+            refresh()
         }
     }
 
-    override fun headers() : List<String> {
-        return listOf("Partition Id", "ISR", "Leader", "Offset")
-    }
+    override fun headers() =  listOf("Partition Id", "ISR", "Leader", "Offset")
 
-    override fun rows() : List<Array<String>> {
-        return getPartitions().map {
-            arrayOf(
-                    it.partition().toString(),
-                    it.isr().joinToString { it.id().toString() },
-                    it.leader().id().toString(),
-                    getOffsets().find { p -> p.first == it.partition() }?.second.toString())
-        }
+    override fun rows() = getPartitions().map { partition ->
+        arrayOf(
+                partition.partition().toString(),
+                partition.isr().joinToString { it.id().toString() },
+                partition.leader().id().toString(),
+                if (offsets == null) {
+                    "loading..."
+                } else {
+                    offsets?.find { p -> p.first == partition.partition() }?.second.toString()
+                }
+        )
     }
 }
 

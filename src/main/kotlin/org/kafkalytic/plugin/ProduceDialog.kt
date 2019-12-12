@@ -49,7 +49,7 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
             file.text = FileChooser.chooseFile(fcd, project, null)?.canonicalPath
         }
 
-        compression = ComboBox(arrayOf("none", "gzip", "snappy", "lz4", "zstd"))
+        compression = ComboBox(KAFKA_COMPRESSION_TYPES)
 
         val panel = JPanel(BorderLayout())
         panel.add(layoutLR(JBLabel("Key "), key), BorderLayout.NORTH)

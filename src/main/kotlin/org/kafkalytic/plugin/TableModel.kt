@@ -3,6 +3,7 @@ package org.kafkalytic.plugin
 import java.util.*
 import javax.swing.table.DefaultTableModel
 import javax.swing.tree.DefaultMutableTreeNode
+import javax.swing.tree.TreeNode
 
 class TableModel : DefaultTableModel() {
     init {
@@ -16,10 +17,10 @@ class TableModel : DefaultTableModel() {
     }
 
     var mute = false
-    var currentNode: DefaultMutableTreeNode? = null
+    var currentNode: TreeNode? = null
     var listener: ((key: String, value: String) -> Unit)? = null
 
-    fun updateDetails(node: DefaultMutableTreeNode?) {
+    fun updateDetails(node: TreeNode?) {
         mute = true
         currentNode = node
         dataVector.clear()

@@ -17,12 +17,12 @@ class CreateTopicDialog() : Messages.InputDialog(
         null,
         object: InputValidator {
             override fun checkInput(inputString: String?) = true
-            override fun canClose(inputString: String?) = inputString != null && inputString.length > 0
+            override fun canClose(inputString: String?) = inputString != null && inputString.isNotEmpty()
         }) {
 
     private val LOG = Logger.getInstance(this::class.java)
-    var partitions: JTextField? = null
-    var replication: JTextField? = null
+    private lateinit var partitions: JTextField
+    private lateinit var replication: JTextField
 
     override fun createMessagePanel(): JPanel {
         val messagePanel = JPanel(BorderLayout())
@@ -32,17 +32,18 @@ class CreateTopicDialog() : Messages.InputDialog(
         }
         myField = createTextFieldComponent()
         myField.preferredSize = Dimension(100, 24)
+        myField.inputVerifier = TOPIC_VERIFIER
         messagePanel.add(createScrollableTextComponent(), BorderLayout.CENTER)
 
+        partitions = JTextField("1")
+        partitions.preferredSize = Dimension(50, 24)
+        partitions.inputVerifier = INT_VERIFIER
+        replication = JTextField("1")
+        replication.preferredSize = Dimension(50, 24)
+        replication.inputVerifier = INT_VERIFIER
         val certPanel = JPanel(GridLayout(2, 2))
-        partitions = JTextField()
-        partitions?.preferredSize = Dimension(50, 24)
-        replication = JTextField()
-        replication?.preferredSize = Dimension(50, 24)
-        certPanel.add(JLabel("Partitions"))
-        certPanel.add(partitions)
-        certPanel.add(JLabel("Replication factor"))
-        certPanel.add(replication)
+        certPanel.addLabelled("Partitions", partitions)
+        certPanel.addLabelled("Replication factor", replication)
 
         messagePanel.add(certPanel, BorderLayout.SOUTH)
 
