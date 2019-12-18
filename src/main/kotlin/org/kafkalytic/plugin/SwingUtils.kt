@@ -1,9 +1,8 @@
 package org.kafkalytic.plugin
 
+import com.intellij.openapi.ui.InputValidator
 import com.intellij.ui.components.JBLabel
-import java.awt.BorderLayout
-import java.awt.Component
-import java.awt.GridLayout
+import java.awt.*
 import java.text.ParseException
 import java.text.SimpleDateFormat
 import javax.swing.InputVerifier
@@ -48,7 +47,18 @@ val INT_VERIFIER = object : InputVerifier() {
         }
     }
 }
+val LONG_VALIDATOR = object: InputValidator {
+    override fun checkInput(inputString: String?) = true
+    override fun canClose(inputString: String?) =
+        try {
+            with(java.lang.Long.parseLong(inputString)) {
+                this <= Long.MAX_VALUE && this >= 0
+            }
+        } catch (e: NumberFormatException) {
+            false
+        }
 
+}
 val DATE_FORMAT = SimpleDateFormat("dd/MM/yy hh:mm:ss")
 val DATE_VERIFIER = object : InputVerifier() {
     override fun verify(input: JComponent) =
@@ -65,14 +75,26 @@ val TOPIC_VERIFIER = object : InputVerifier() {
 }
 
 val LONG_VERIFIER = object : InputVerifier() {
-    override fun verify(input: JComponent) : Boolean {
-        try {
-            with(java.lang.Long.parseLong((input as JTextField).text)) {
-                return this <= Long.MAX_VALUE && this >= 0
-            }
-        } catch (e: NumberFormatException) {
-            return false
+    override fun verify(input: JComponent) = LONG_VALIDATOR.canClose((input as JTextField).text)
+}
+
+class HintTextField(private val _hint: String) : JTextField() {
+    override fun paint(g: Graphics) {
+        super.paint(g)
+        if (text.length == 0) {
+            val h = height
+            (g as Graphics2D).setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
+            val ins: Insets = insets
+            val fm: FontMetrics = g.getFontMetrics()
+            val c0 = background.rgb
+            val c1 = foreground.rgb
+            val m = -0x1010102
+            val c2 = (c0 and m ushr 1) + (c1 and m ushr 1)
+            g.setColor(Color(c2, true))
+            g.drawString(_hint, ins.left, h / 2 + fm.getAscent() / 2 - 2)
         }
     }
+
 }
+
 
