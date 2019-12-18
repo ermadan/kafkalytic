@@ -381,7 +381,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         }
         return tree.selectionPaths.fold(true) { a, v ->
             val path = v.lastPathComponent
-            a && (path is KRootTreeNode) && (path.isLeaf || path is KRootTreeNode)
+            a && (path is KRootTreeNode) && (path.isLeaf )
         }
     }
 
