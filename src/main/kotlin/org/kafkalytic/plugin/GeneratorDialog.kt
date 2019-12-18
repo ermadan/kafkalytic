@@ -23,12 +23,6 @@ class GeneratorDialog(val project: Project, topic: String) : DialogWrapper(false
     private lateinit var messageSize: JTextField
     private lateinit var template: JTextArea
     private lateinit var compression: ComboBox<String>
-//    private lateinit var radios: List<JRadioButton>
-//    override fun stateChanged(e: ChangeEvent?) {
-//        messageSize.isEnabled = radios[0].isSelected
-//        fileButton.isEnabled = radios[1].isSelected
-//        template.isEnabled = radios[1].isSelected
-//    }
 
     init {
         setTitle("Configure Kafka message generator for topic $topic")
@@ -39,8 +33,6 @@ class GeneratorDialog(val project: Project, topic: String) : DialogWrapper(false
         delay = JTextField("10")
         delay.setInputVerifier(LONG_VERIFIER)
         delay.preferredSize = Dimension(200, 24)
-
-//        radios = arrayOf("Generate random content ", "Use template ").map { JRadioButton(it) }
 
         template = JTextArea(10, 43)
         template.text = """
@@ -79,20 +71,6 @@ class GeneratorDialog(val project: Project, topic: String) : DialogWrapper(false
         panel.addLabelled("Compression", compression)
         panel.addLabelled("Random part size", messageSize)
         return layoutUD(panel, layoutUD(template, fileButton))
-//        panel.add(layoutUD(
-//            layoutLR(radios[1], JBScrollPane(value)),
-//            layoutLR(radios[0], layoutLR(numberOfMessages, browse)),
-//            layoutLR(JBLabel("Compression"), compression)), BorderLayout.SOUTH)
-
-//        val radioGroup = ButtonGroup()
-//        radios.forEach {
-//            radioGroup.add(it)
-//            it.addChangeListener(this)
-//        }
-//        radios[1].isSelected = true
-//        stateChanged(null)
-
-//        return panel
     }
 
     fun getDelay() = delay.text.toLong()
