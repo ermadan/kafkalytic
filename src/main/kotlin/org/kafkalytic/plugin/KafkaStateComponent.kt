@@ -11,6 +11,7 @@ class KafkaStateComponent : PersistentStateComponent<KafkaStateComponent> {
     private val LOG = Logger.getInstance("KafkaStateComponent")
 
     var clusters : MutableMap<String, MutableMap<String, String>> = mutableMapOf()
+    var config = mutableMapOf<String, Any>()
 
     fun addCluster(c: Map<String, String>) {
         val cluster = c.toMutableMap()
