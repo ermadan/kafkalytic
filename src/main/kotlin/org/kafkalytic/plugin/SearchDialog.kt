@@ -1,7 +1,7 @@
 package org.kafkalytic.plugin
 
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.ValidationInfo
 import java.awt.*
 import java.util.*
 import javax.swing.*
@@ -9,22 +9,32 @@ import javax.swing.event.ChangeEvent
 import javax.swing.event.ChangeListener
 
 class SearchDialog(topic: String) : DialogWrapper(false) {
-    private lateinit var pattern: JTextField
+    private lateinit var valuePattern: JTextField
+    private lateinit var keyPattern: JTextField
     private lateinit var timestampPanel: TimestampPanel
 
     init {
         title = "Configure Kafka search for topic $topic"
         init()
-//        preferredSize = Dimension(500, 150)
+    }
+
+    override fun doValidate(): ValidationInfo? = if (valuePattern.text.isBlank() && keyPattern.text.isBlank()) {
+        ValidationInfo("One of pattern fields should not be blank", null)
+    } else {
+        null
     }
 
     override fun createCenterPanel(): JPanel {
-        pattern = JTextField("")
-        pattern.preferredSize = Dimension(200, 24)
+        valuePattern = HintTextField("regexp")
+        valuePattern.preferredSize = Dimension(200, 24)
+        keyPattern = HintTextField("regexp")
+        keyPattern.preferredSize = Dimension(200, 24)
 
         timestampPanel = TimestampPanel()
 
-        return layoutUD(timestampPanel, layoutLR(JLabel("Search pattern (regexp)"), pattern))
+        return layoutUD(timestampPanel,
+                layoutLR(JLabel("Value search pattern"), valuePattern),
+                layoutLR(JLabel("Key search pattern"), keyPattern))
     }
 
     class TimestampPanel : JPanel(), ChangeListener {
@@ -70,6 +80,7 @@ class SearchDialog(topic: String) : DialogWrapper(false) {
         }
     }
 
-    fun getPattern() = pattern.text
+    fun getKeyPattern() = keyPattern.text
+    fun getValuePattern() = valuePattern.text
     fun getTimestamp() = timestampPanel.getTimestamp()
 }
