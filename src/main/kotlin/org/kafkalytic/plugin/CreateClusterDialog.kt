@@ -7,14 +7,18 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.InputValidator
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.table.JBTable
-import java.awt.BorderLayout
-import java.awt.GridLayout
+import org.apache.kafka.clients.admin.AdminClient
+import org.apache.kafka.common.KafkaException
+import java.awt.*
 import java.io.FileReader
+import java.io.IOException
 import java.util.*
-import javax.swing.*
-import javax.swing.event.TableModelEvent
-import javax.swing.event.TableModelListener
+import javax.swing.JButton
+import javax.swing.JLabel
+import javax.swing.JPanel
+import javax.swing.JTextField
 import javax.swing.table.DefaultTableModel
+
 
 class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         "Enter Kafka bootstrap servers as host:port,host2:port",
@@ -30,6 +34,7 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
 
     private val LOG = Logger.getInstance(this::class.java)
     private lateinit var name: JTextField
+    private lateinit var zoo: JTextField
     private lateinit var tableModel: DefaultTableModel
     private lateinit var trustPath: JTextField
     private lateinit var keyPath: JTextField
@@ -49,9 +54,35 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         tableModel.addColumn("Property")
         tableModel.addColumn("Value")
         tableModel.addTableModelListener {  }
-        myField = createTextFieldComponent()
+        myField = HintTextField("host1:port,host2:port")
         messagePanel.add(createScrollableTextComponent(), BorderLayout.CENTER)
         val browse = JButton("Load properties from file")
+        val testConnection = JButton("Test connection")
+        testConnection.addActionListener {
+            try {
+                AdminClient.create(getCluster() as Map<String, Any>).close()
+                if (zoo.text.isNullOrBlank()) {
+                    info("Connection successful")
+                }
+            } catch (e: KafkaException) {
+                info("Cannot connect to Kafka cluster. $e")
+            }
+            if (!zoo.text.isNullOrBlank()) {
+                val split = zoo.text.trim().split("/")
+                try {
+                    val zoo = ZkUtils.getZk(split[0])
+                    val zoopath = "/" + split.subList(1, split.size).joinToString ("/")
+                    if (zoo.exists(zoopath, false) == null) {
+                        info("Path $zoopath not found.")
+                    } else {
+                        info("Connection successful")
+                    }
+                    zoo.close()
+                } catch (e: IOException) {
+                    info("Cannot connect to Zookeeper cluster. $e")
+                }
+            }
+        }
         browse.addActionListener {
             val fcd = FileChooserDescriptor(true, false, false, false, false, false)
             val props = Properties()
@@ -70,23 +101,21 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         val subPanel = JPanel(BorderLayout())
         subPanel.add(layoutLR(JLabel("Cluster name (optional)"), name), BorderLayout.NORTH)
         val certSubPanel = JPanel(GridLayout(0, 2))
-        trustPath = JTextField()
-        keyPath = JTextField()
+        zoo = HintTextField("host1:port/path_to_kafka_namespace")
+        trustPath = HintTextField("local path")
+        keyPath = HintTextField("local path")
         trustPassword = JTextField()
         keyPassword = JTextField()
         requestTimeout = JTextField("5000")
-        certSubPanel.add(JLabel("Truststore path"))
-        certSubPanel.add(trustPath)
-        certSubPanel.add(JLabel("Truststore password"))
-        certSubPanel.add(trustPassword)
-        certSubPanel.add(JLabel("Keystore path"))
-        certSubPanel.add(keyPath)
-        certSubPanel.add(JLabel("Keystore password"))
-        certSubPanel.add(keyPassword)
-        certSubPanel.add(JLabel("Request timeout, ms"))
-        certSubPanel.add(requestTimeout)
+        requestTimeout.inputVerifier = INT_VERIFIER
+        certSubPanel.addLabelled("zookeeper (enables topic configs, optional)", zoo)
+        certSubPanel.addLabelled("Truststore path", trustPath)
+        certSubPanel.addLabelled("Truststore password", trustPassword)
+        certSubPanel.addLabelled("Keystore path", keyPath)
+        certSubPanel.addLabelled("Keystore password", keyPassword)
+        certSubPanel.addLabelled("Request timeout, ms", requestTimeout)
         subPanel.add(certSubPanel, BorderLayout.CENTER)
-        subPanel.add(layoutUD(browse, JBTable(tableModel)), BorderLayout.SOUTH)
+        subPanel.add(layoutUD(browse, JBTable(tableModel), testConnection), BorderLayout.SOUTH)
 
         messagePanel.add(subPanel, BorderLayout.SOUTH)
         return messagePanel
@@ -95,13 +124,14 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
     fun getCluster(): MutableMap<String, String> {
         var props = tableModel.dataVector.elements().asSequence()
                 .map { val v = it as Vector<*>; v[0].toString() to v[1].toString() }.toMap().toMutableMap()
-        if (!inputString.isNullOrEmpty()) {
-            props.put("bootstrap.servers", inputString.toString())
+        if (!myField.text.trim().isNullOrEmpty()) {
+            props.put("bootstrap.servers", myField.text.trim())
         }
         props.put("name", name.text.ifBlank { props["bootstrap.servers"]!! })
         if (requestTimeout.text.isNotBlank()) {
             props.put("request.timeout.ms", requestTimeout.text)
         }
+        props.put(ZOOKEEPER_PROPERTY, zoo.text.trim())
         if (trustPath.text.isNotBlank()) {
             props.putAll(mapOf(
                     "security.protocol" to "SSL",
