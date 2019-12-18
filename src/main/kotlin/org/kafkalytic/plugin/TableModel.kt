@@ -5,6 +5,21 @@ import javax.swing.table.DefaultTableModel
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.TreeNode
 
+class TopicTableModel: DefaultTableModel() {
+    init {
+        listOf("Property", "Value").forEach { addColumn(it) }
+    }
+    fun updateDetails(node: TreeNode?) {
+        dataVector.clear()
+        if (node != null) {
+            if (node is KTopicTreeNode) {
+                node.zooPropValues()?.forEach { addRow(it) }
+            }
+        }
+    }
+    override fun isCellEditable(row: Int, column: Int) = false
+}
+
 class TableModel : DefaultTableModel() {
     init {
         addTableModelListener { e ->
