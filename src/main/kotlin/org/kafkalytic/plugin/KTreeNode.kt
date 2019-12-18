@@ -1,12 +1,11 @@
 package org.kafkalytic.plugin
 
+import com.google.gson.Gson
 import com.intellij.openapi.diagnostic.Logger
-import org.apache.kafka.clients.admin.AdminClient
-import org.apache.kafka.clients.admin.NewPartitions
-import org.apache.kafka.clients.admin.NewTopic
-import org.apache.kafka.clients.admin.RecordsToDelete
+import org.apache.kafka.clients.admin.*
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.TopicPartition
+import org.apache.zookeeper.ZooKeeper
 import java.util.concurrent.ExecutionException
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.MutableTreeNode
@@ -14,6 +13,8 @@ import javax.swing.tree.MutableTreeNode
 const val BROKERS = "Brokers"
 const val TOPICS = "Topics"
 const val CONSUMERS = "Consumers"
+const val ZOOKEEPER_PROPERTY = "zookeeper"
+
 
 interface KafkaTableNode {
     fun headers() = emptyList<String>()
@@ -68,12 +69,27 @@ abstract class KafkaTreeNode(userObject: Any) : DefaultMutableTreeNode(userObjec
 
 class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTreeNode(clusterProperties) {
     var client: AdminClient? = null
+    var zoo: ZooKeeper? = null
+    var zoopath = ""
+    init {
+        if (clusterProperties[ZOOKEEPER_PROPERTY] == null) {
+            clusterProperties[ZOOKEEPER_PROPERTY] = "" //migration onto schema with zk
+        }
+    }
 
     override fun expand() {
         if (client == null) {
             LOG.info("Creating client with $clusterProperties")
             try {
                 client = AdminClient.create(clusterProperties as Map<String, Any>)
+                val url = clusterProperties[ZOOKEEPER_PROPERTY]
+                if (!url.isNullOrBlank()) {
+                    val split = url.split("/")
+                    zoo = ZkUtils.getZk(split[0])
+                    if (split.size > 1) {
+                        zoopath = "/" + split.subList(1, split.size).joinToString ("/")
+                    }
+                }
             } catch (e: KafkaException) {
                 error("Cannot connect to Kafka cluster ${clusterProperties["bootstrap.servers"]}", e)
             }
@@ -81,10 +97,13 @@ class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTr
         super.expand()
     }
 
-    fun createTopic(name: String, partitions: Int, replications: Short) {
+    fun createTopic(name: String, partitions: Int, replications: Short, config: Map<String, String>): CreateTopicsResult? {
         LOG.info("Creating topic $name")
-        client?.createTopics(listOf(NewTopic(name, partitions, replications)))
+        val newTopic = NewTopic(name, partitions, replications)
+        newTopic.configs(config)
+        val result = client?.createTopics(listOf(newTopic))
         LOG.info("Creating topic done.")
+        return result
     }
 
     override fun headers() = listOf("Property", "Value")
@@ -128,7 +147,8 @@ class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTr
         },
         object : KafkaTreeNode(TOPICS) {
             override fun readChildren(client: AdminClient) =
-                client.listTopics().listings().get().filter { !it.isInternal }.map { it.name() }.sorted()
+//                    client.listTopics(ListTopicsOptions().listInternal(true)).listings().get().filter { !it.isInternal }.map { it.name() }.sorted()
+                client.listTopics(ListTopicsOptions().listInternal(true)).listings().get().map { it.name() }.sorted()
                     .map {
                         KTopicTreeNode(it, this@KRootTreeNode)
                     }
@@ -139,7 +159,7 @@ class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTr
 
     fun delete(names: Collection<String>) {
         client?.let { it.deleteTopics(names).all().get() }
-        getTopics()?.refresh()
+        getTopics().refresh()
     }
 
     override fun toString() = (clusterProperties["name"] ?: clusterProperties["bootstrap.servers"]) as String
@@ -193,7 +213,10 @@ class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMut
                 }
         )
     }
+
+
+    fun zooPropValues() = cluster.zoo?.getData(cluster.zoopath + "/config/topics/" + getTopicName(), false, null)?.let {
+        (Gson().fromJson(String(it), Map::class.java).get("config") as Map<String, Any>).map { (k, v) -> arrayOf(k.toString(), v.toString())}
+    }
 }
 
-class KPartitionTreeNode(id: Int, offset: Long) : DefaultMutableTreeNode ("partition $id offset $offset") {
-}
