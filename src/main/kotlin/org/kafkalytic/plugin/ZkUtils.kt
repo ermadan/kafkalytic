@@ -48,9 +48,9 @@ object ZkUtils {
     fun format(size: Int) =
             " (" + if (size > 1000) {
                 if (size > 1000_000) {
-                    (size / 1000_000 as Int).toString() + "M"
+                    (size / 1000_000).toString() + "M"
                 } else {
-                    (size / 1000 as Int).toString() + "K"
+                    (size / 1000).toString() + "K"
                 }
             } else {
                 size
