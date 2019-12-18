@@ -13,7 +13,7 @@ import org.apache.kafka.common.TopicPartition
 import java.time.Duration
 import java.util.*
 
-fun consume(topic: String, props: Map<String, Any>, dialog: ConsumeDialog) {
+fun consume(topic: String, props: Map<String, Any>, dialog: ConsumeDialog, progress: ProgressIndicator) {
     val local = props.toMutableMap()
 
     local.put("group.id", "kafkalytic")
@@ -29,7 +29,7 @@ fun consume(topic: String, props: Map<String, Any>, dialog: ConsumeDialog) {
     when (dialog.getMode()) {
         0 -> {
             consumer.subscribe(listOf(topic))
-            consume(consumer, topic, dialog.getWaitFor(), dialog.getPolls())
+            consume(consumer, topic, dialog.getWaitFor(), dialog.getPolls(), progress)
         }
         1 -> {
             consumer.subscribe(listOf(topic))
@@ -40,22 +40,25 @@ fun consume(topic: String, props: Map<String, Any>, dialog: ConsumeDialog) {
             endOffsets.forEach{ (partition, offset) ->
                 consumer.seek(partition, if (dialog.getDecrement() > offset) 0 else offset - dialog.getDecrement())
             }
-            consume(consumer, topic, dialog.getDecrement() * endOffsets.size)
+            consume(consumer, topic, dialog.getDecrement() * endOffsets.size, 5,progress)
         }
         2 -> {
             val partitions = consumer.partitionsFor(topic)
             consumer.assign(partitions.filter { it.partition() == dialog.getPartition() }
                     .map { TopicPartition(topic, it.partition())})
             consumer.seek(TopicPartition(topic, dialog.getPartition()), dialog.getOffset())
-            consume(consumer, topic, 1)
+            consume(consumer, topic, 1, 5,  progress)
         }
     }
     consumer.unsubscribe()
 }
 
-private fun consume(consumer: KafkaConsumer<Any, Any>, topic: String, howMany : Int, polls: Int = 5) {
+private fun consume(consumer: KafkaConsumer<Any, Any>, topic: String, howMany : Int, polls: Int, progress: ProgressIndicator) {
     var consumed = 0
     repeat(polls) { _ ->
+        if (progress.isCanceled) {
+            return
+        }
         val records = consumer.poll(Duration.ofSeconds(3)) as ConsumerRecords<Any, Any>
         // Handle new records
         LOG.info("polling:" + records.count())

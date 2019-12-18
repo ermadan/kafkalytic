@@ -39,6 +39,8 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
     private val treeModel by lazy { DefaultTreeModel(zRoot) }
     private val tree by lazy { Tree(treeModel) }
     private val tableModel by lazy {TableModel()}
+    private val topicTableModel by lazy {TopicTableModel()}
+    private val topicTable by lazy {JBTable(topicTableModel)}
     private val addButton by lazy {AddAction()}
     private val removeButton by lazy {RemoveAction()}
     private val refreshButton by lazy {RefreshAction()}
@@ -50,7 +52,31 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         LOG.info("Main window created")
         add(getToolbar(), BorderLayout.PAGE_START)
 
-        val panel = JSplitPane(JSplitPane.VERTICAL_SPLIT)
+
+        tree.isRootVisible = false
+        tree.selectionModel.selectionMode = TreeSelectionModel.DISCONTIGUOUS_TREE_SELECTION
+
+        val details = JBTable(tableModel)
+        details.fillsViewportHeight = false
+        details.setShowColumns(true)
+
+        topicTable.fillsViewportHeight = false
+        topicTable.setShowColumns(true)
+
+        val propsSplit = JSplitPane(JSplitPane.VERTICAL_SPLIT)
+        val jbScrollPane = JBScrollPane(details)
+        propsSplit.topComponent = jbScrollPane
+        propsSplit.resizeWeight = 0.7
+        propsSplit.dividerSize = 2
+
+        val mainSplit = JSplitPane(JSplitPane.VERTICAL_SPLIT)
+        mainSplit.topComponent = JBScrollPane(tree)
+        mainSplit.bottomComponent = propsSplit
+        mainSplit.resizeWeight = 0.7
+        mainSplit.dividerSize = 2
+
+
+        add(mainSplit, BorderLayout.CENTER)
 
         config.clusters.forEach { LOG.info("init node:$it"); zRoot.add(KRootTreeNode(it.value)) }
         tree.expandPath(TreePath(zRoot))
@@ -58,7 +84,22 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         tree.addTreeSelectionListener {
             it?.newLeadSelectionPath?.lastPathComponent?.let {node ->
                 LOG.info("selection changed:$node")
-                tableModel.updateDetails(node as DefaultMutableTreeNode)
+                if (node is KRootTreeNode) {
+                    if (node.clusterProperties[ZOOKEEPER_PROPERTY].isNullOrBlank() && config.config["zookeeper_tip"] == null) {
+                        info("""
+                            |Did you know that you can set Zookeeper url in cluster properties, 
+                            |press refresh and see additional topic configuration
+                            """.trimMargin())
+                        config.config["zookeeper_tip"] = "shown"
+                    }
+                }
+                propsSplit.bottomComponent = if (node is KTopicTreeNode) {
+                    JBScrollPane(topicTable)
+                } else {
+                    null
+                }
+                topicTableModel.updateDetails(node as TreeNode)
+                tableModel.updateDetails(node)
                 background("Loading properties $node") {
                     if (node is KafkaNode) {
                         node.expand()
@@ -124,7 +165,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                             val connection = last.cluster.clusterProperties
                             val topic = last.getTopicName()
                             menu.add("Change partitions number") {
-                                Messages.showInputDialog(it, it, Messages.getQuestionIcon())?.run {
+                                Messages.showInputDialog(it, it, Messages.getQuestionIcon(), last.getPartitions().size.toString(), LONG_VALIDATOR)?.run {
                                     background(it) {
                                         last.setPartitions(this.toInt())
                                         refreshNode(last)
@@ -133,7 +174,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                             }
                             menu.add("Remove messages before offset") {
                                 Messages.showInputDialog("Enter offset",
-                                        it, Messages.getQuestionIcon())?.run {
+                                        it, Messages.getQuestionIcon(), "0", LONG_VALIDATOR)?.run {
                                     background(it) {
                                         last.deleteRecords(this.toLong())
                                         refreshNode(last)
@@ -143,17 +184,17 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                             menu.add("Consume ") {
                                 val dialog = ConsumeDialog(topic)
                                 if (dialog.showAndGet()) {
-                                    background (it, longTaskQueue) {
-                                        consume(topic, connection, dialog)
+                                    background (it, longTaskQueue) { progress ->
+                                        consume(topic, connection, dialog,  progress)
                                     }
                                 }
                             }
                             menu.add("Search topic for the message") {
                                 val dialog = SearchDialog(topic)
                                 if (dialog.showAndGet()) {
-                                    background (it + dialog.getPattern(), longTaskQueue) {
+                                    background (it + dialog.getValuePattern(), longTaskQueue) { progress ->
                                         search(connection, topic,
-                                                dialog.getPattern(), dialog.getTimestamp())
+                                                dialog.getKeyPattern(), dialog.getValuePattern(), dialog.getTimestamp(), progress)
                                     }
                                 }
                             }
@@ -173,14 +214,14 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                                     }
                                 }
                             }
-                            menu.add("Message mass-generator") {
+                            menu.add("Message bulk generator") {
                                 val dialog = GeneratorDialog(project, topic)
                                 if (dialog.showAndGet()) {
-                                    background(it, longTaskQueue) {
-                                        last.cluster.produce(dialog.getCompression(), dialog.getBatchSize()) { producer ->
+                                    background(it, longTaskQueue) { progress ->
+                                        withProducer(last.cluster.clusterProperties, dialog.getCompression(), dialog.getBatchSize()) { producer ->
                                             produceGeneratedMessages(producer, topic,
                                                     dialog.getTemplate(), dialog.getMessageSize(),
-                                                    dialog.getNumberOfMessages(), dialog.getDelay())
+                                                    dialog.getNumberOfMessages(), dialog.getDelay(), progress)
                                         }
                                         refreshNode(last)
                                     }
@@ -189,10 +230,10 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                             menu.add("Copy topic messages to another") {
                                 val dialog = CopyDialog(topic, last.cluster, zRoot.children().toList() as List<KRootTreeNode>)
                                 if (dialog.showAndGet()) {
-                                    background (it, longTaskQueue) {
+                                    background (it, longTaskQueue) { progress ->
                                         copy(connection, topic,
                                                 dialog.getSelectedCluster().clusterProperties, dialog.getSelectedTopic().getTopicName(),
-                                                dialog.getTimestamp(), dialog.getCompression())
+                                                dialog.getTimestamp(), dialog.getCompression(), progress)
                                     }
                                 }
                             }
@@ -207,9 +248,16 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                                 val dialog = CreateTopicDialog()
                                 if (dialog.showAndGet()) {
                                     background(it) {
-                                        clusterNode.createTopic(dialog.getTopic(), dialog.getPartitions(), dialog.getReplications())
-                                        info("topic " + dialog.getTopic() + "was created.")
-                                        refreshNode(clusterNode.getTopics())
+                                        val result = clusterNode.createTopic(dialog.getTopic(), dialog.getPartitions(),
+                                                dialog.getReplications(), dialog.getConfig())
+                                        val future = result?.values()?.get(dialog.getTopic())
+                                        try {
+                                            future?.get()
+                                            info("topic ${dialog.getTopic()} was created.")
+                                            refreshNode(clusterNode.getTopics())
+                                        } catch (e : Exception) {
+                                            info("$future\ntopic ${dialog.getTopic()} was not created")
+                                        }
                                     }
                                 }
                             }
@@ -223,8 +271,6 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
             }
         })
 
-        tree.isRootVisible = false
-        tree.selectionModel.selectionMode = TreeSelectionModel.DISCONTIGUOUS_TREE_SELECTION
         tree.addTreeExpansionListener(object : TreeExpansionListener {
             override fun treeExpanded(event: TreeExpansionEvent?) {
                 val node = event!!.path.lastPathComponent
@@ -239,9 +285,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
             override fun treeCollapsed(event: TreeExpansionEvent?) {
             }
         })
-        val details = JBTable(tableModel)
-        details.fillsViewportHeight = false
-        details.setShowColumns(true)
+
         tableModel.addEditListener { key, value ->
             if (tableModel.currentNode is KRootTreeNode) {
                 val clusterConfig = (tableModel.currentNode as KRootTreeNode).clusterProperties
@@ -263,12 +307,6 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                 treeModel.reload(tableModel.currentNode)
             }
         }
-
-        panel.topComponent = JBScrollPane(tree)
-        panel.bottomComponent = JBScrollPane(details)
-        panel.resizeWeight = 0.7
-        panel.dividerSize = 2
-        add(panel, BorderLayout.CENTER)
     }
 
     private fun refreshNode(node: KafkaNode) {
@@ -381,22 +419,30 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         }
         return tree.selectionPaths.fold(true) { a, v ->
             val path = v.lastPathComponent
-            a && (path is KRootTreeNode) && (path.isLeaf )
+            a && (path is KRootTreeNode) && (path.isLeaf || path is KRootTreeNode)
         }
     }
 
-    fun background(title: String, queue: BackgroundTaskQueue = taskQueue, task: () -> Unit) {
+    fun background(title: String, queue: BackgroundTaskQueue = taskQueue, task: (ProgressIndicator) -> Unit) {
         background(project, title, queue, task)
     }
 
-    fun background(project: Project?, title: String, queue: BackgroundTaskQueue, task: () -> Unit) {
-        queue.run(object: Task.Backgroundable(project, title, false) {
-            override fun run(indicator: ProgressIndicator) {
-                LOG.info("background task started:$title")
-                task()
-                LOG.info("background task complete:$title")
-            }
-        })
+    class CancelableTask(title: String, project: Project?, val task: (ProgressIndicator) -> Unit) : Task.Backgroundable(project, title, true) {
+        var cancel = false
+        override fun run(indicator: ProgressIndicator) {
+            LOG.info("background task started:$title")
+            task(indicator)
+            LOG.info("background task complete:$title")
+        }
+
+        override fun onCancel() {
+            cancel = true
+            super.onCancel()
+        }
+    }
+
+    fun background(project: Project?, title: String, queue: BackgroundTaskQueue, task: (ProgressIndicator) -> Unit) {
+        queue.run(CancelableTask(title, project, task))
     }
 }
 
