@@ -129,15 +129,19 @@ inline fun <T> withConsumer(connection: Map<String, String>, topic: String, time
         if (partitions != null) {
             val endOffsets = consumer.endOffsets(partitions).map { it.key.partition() to it.value - 1 }.filter { it.second > 0 }.toMap().toMutableMap()
             val targetOffsets = seekToTimestamp(consumer, partitions, timestamp)
-            notify("Reading messages from $topic " + endOffsets.map {
-                "partition ${it.key} from offset ${targetOffsets.entries.find { it.key.partition() == it.key.partition() }?.value} to ${it.value}"
-            }.joinToString("\n"))
-            targetOffsets.forEach {
-                if (it.value.offset() >= endOffsets[it.key.partition()] ?: 0) {
-                    endOffsets.remove(it.key.partition())
+            if (targetOffsets.isEmpty()) {
+                notify("No messages found for timestamp $timestamp")
+            } else {
+                notify("Reading messages from $topic " + endOffsets.map {
+                    "partition ${it.key} from offset ${targetOffsets.entries.find { it.key.partition() == it.key.partition() }?.value} to ${it.value}"
+                }.joinToString("\n"))
+                targetOffsets.forEach {
+                    if (it.value.offset() >= endOffsets[it.key.partition()] ?: 0) {
+                        endOffsets.remove(it.key.partition())
+                    }
                 }
+                consume(consumer, endOffsets)
             }
-            consume(consumer, endOffsets)
         }
     }
 }
@@ -239,4 +243,4 @@ fun notify(log: String) {
     Notifications.Bus.notify(Notification("Kafkalytic", "Kafkalytic", log, NotificationType.INFORMATION))
 }
 
-val KAFKA_COMPRESSION_TYPES = arrayOf("none", "gzip", "snappy", "lz4", "zstd")
+val KAFKA_COMPRESSION_TYPES = arrayOf("uncompressed", "gzip", "snappy", "lz4", "zstd")
