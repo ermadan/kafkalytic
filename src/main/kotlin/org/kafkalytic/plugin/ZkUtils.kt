@@ -1,6 +1,7 @@
 package org.kafkalytic.plugin
 
 import com.intellij.openapi.diagnostic.Logger
+import org.apache.zookeeper.KeeperException
 import org.apache.zookeeper.WatchedEvent
 import org.apache.zookeeper.Watcher
 import org.apache.zookeeper.ZooKeeper
@@ -41,6 +42,15 @@ object ZkUtils {
         return zk
     }
 
+    fun getData(source: String, path: String) =
+        try {
+            getZk(source)?.getData(path, false, null)
+        } catch (e: KeeperException) {
+            LOG.info("KeeperException $e, retry")
+            disconnect(source)
+            getZk(source)?.getData(path, false, null)
+        }
+
     fun disconnect(source: String) {
         getZk(source).close()
     }
@@ -48,9 +58,9 @@ object ZkUtils {
     fun format(size: Int) =
             " (" + if (size > 1000) {
                 if (size > 1000_000) {
-                    (size / 1000_000).toString() + "M"
+                    (size / 1000_000 as Int).toString() + "M"
                 } else {
-                    (size / 1000).toString() + "K"
+                    (size / 1000 as Int).toString() + "K"
                 }
             } else {
                 size
