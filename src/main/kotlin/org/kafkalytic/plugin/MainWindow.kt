@@ -55,6 +55,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
 
         tree.isRootVisible = false
         tree.selectionModel.selectionMode = TreeSelectionModel.DISCONTIGUOUS_TREE_SELECTION
+        tree.cellRenderer = CellRenderer()
 
         val details = JBTable(tableModel)
         details.fillsViewportHeight = false
@@ -189,7 +190,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                                     }
                                 }
                             }
-                            menu.add("Search topic for the message") {
+                            menu.add("Search topic for the message ") {
                                 val dialog = SearchDialog(topic)
                                 if (dialog.showAndGet()) {
                                     background (it + dialog.getValuePattern(), longTaskQueue) { progress ->
