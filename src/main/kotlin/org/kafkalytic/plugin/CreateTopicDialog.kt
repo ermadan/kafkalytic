@@ -127,5 +127,5 @@ class CreateTopicDialog() : Messages.InputDialog(
     fun getTopic() = inputString!!
     fun getPartitions() = partitions.text.toInt()
     fun getReplications() = replication.text.toShort()
-    fun getConfig() = options.getConfig().toMutableMap().also {it.put("compression.type", "gzip")}
+    fun getConfig() = options.getConfig().toMutableMap().also {it.put("compression.type", compression.selectedItem.toString())}
 }
