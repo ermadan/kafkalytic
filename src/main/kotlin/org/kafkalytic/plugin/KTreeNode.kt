@@ -5,7 +5,7 @@ import com.intellij.openapi.diagnostic.Logger
 import org.apache.kafka.clients.admin.*
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.TopicPartition
-import org.apache.zookeeper.ZooKeeper
+import org.apache.zookeeper.KeeperException
 import java.util.concurrent.ExecutionException
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.MutableTreeNode
@@ -69,12 +69,24 @@ abstract class KafkaTreeNode(userObject: Any) : DefaultMutableTreeNode(userObjec
 
 class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTreeNode(clusterProperties) {
     var client: AdminClient? = null
-    var zoo: ZooKeeper? = null
-    var zoopath = ""
     init {
         if (clusterProperties[ZOOKEEPER_PROPERTY] == null) {
             clusterProperties[ZOOKEEPER_PROPERTY] = "" //migration onto schema with zk
         }
+    }
+
+    fun getZkData(topic: String): ByteArray? {
+        val url = clusterProperties[ZOOKEEPER_PROPERTY]
+        if (!url.isNullOrBlank()) {
+            val split = url.split("/")
+            val path = if (split.size > 1) {
+                "/" + split.subList(1, split.size).joinToString ("/")
+            } else {
+                ""
+            }
+            return ZkUtils.getData(split[0], "$path/config/topics/$topic")
+        }
+        return null
     }
 
     override fun expand() {
@@ -82,14 +94,6 @@ class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTr
             LOG.info("Creating client with $clusterProperties")
             try {
                 client = AdminClient.create(clusterProperties as Map<String, Any>)
-                val url = clusterProperties[ZOOKEEPER_PROPERTY]
-                if (!url.isNullOrBlank()) {
-                    val split = url.split("/")
-                    zoo = ZkUtils.getZk(split[0])
-                    if (split.size > 1) {
-                        zoopath = "/" + split.subList(1, split.size).joinToString ("/")
-                    }
-                }
             } catch (e: KafkaException) {
                 error("Cannot connect to Kafka cluster ${clusterProperties["bootstrap.servers"]}", e)
             }
@@ -147,7 +151,6 @@ class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTr
         },
         object : KafkaTreeNode(TOPICS) {
             override fun readChildren(client: AdminClient) =
-//                    client.listTopics(ListTopicsOptions().listInternal(true)).listings().get().filter { !it.isInternal }.map { it.name() }.sorted()
                 client.listTopics(ListTopicsOptions().listInternal(true)).listings().get().map { it.name() }.sorted()
                     .map {
                         KTopicTreeNode(it, this@KRootTreeNode)
@@ -215,8 +218,8 @@ class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMut
     }
 
 
-    fun zooPropValues() = cluster.zoo?.getData(cluster.zoopath + "/config/topics/" + getTopicName(), false, null)?.let {
-        (Gson().fromJson(String(it), Map::class.java).get("config") as Map<String, Any>).map { (k, v) -> arrayOf(k.toString(), v.toString())}
+    fun zooPropValues() = cluster.getZkData(getTopicName())?.let {
+        (Gson().fromJson(String(it), Map::class.java).get("config") as Map<String, Any>)?.map {(k, v) -> arrayOf(k.toString(), v.toString())}
     }
 }
 
