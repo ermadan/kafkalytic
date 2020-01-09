@@ -1,17 +1,15 @@
 package org.kafkalytic.plugin
 
+import com.google.gson.Gson
+import com.google.gson.JsonSyntaxException
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.Notifications
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
-import com.intellij.openapi.progress.Task
-import com.intellij.openapi.project.Project
 import org.apache.kafka.clients.consumer.ConsumerRecords
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.TopicPartition
 import java.time.Duration
-import java.util.*
 
 fun consume(topic: String, props: Map<String, Any>, dialog: ConsumeDialog, progress: ProgressIndicator) {
     val local = props.toMutableMap()
@@ -64,7 +62,7 @@ private fun consume(consumer: KafkaConsumer<Any, Any>, topic: String, howMany : 
         LOG.info("polling:" + records.count())
         records.forEach {
             Notifications.Bus.notify(Notification("Kafkalytic", "topic:$topic",
-                    "key:${it.key()}, partition:${it.partition()}, offset:${it.offset()}, message:${it.value()}",
+                    "key:${it.key()}, partition:${it.partition()}, offset:${it.offset()}, message:\n${format(it.value())}",
                     NotificationType.INFORMATION))
             consumed++
             if (consumed == howMany) {
