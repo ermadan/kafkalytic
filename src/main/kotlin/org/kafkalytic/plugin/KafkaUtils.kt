@@ -1,5 +1,7 @@
 package org.kafkalytic.plugin
 
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonSyntaxException
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.Notifications
@@ -16,21 +18,21 @@ import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.kafka.common.serialization.ByteArraySerializer
-import org.apache.kafka.common.serialization.StringSerializer
+import java.lang.IllegalStateException
 import java.time.Duration
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
 import kotlin.math.roundToInt
 import kotlin.system.measureTimeMillis
 
-fun loadOffsets(connection: MutableMap<String, String>, topic: String) : Collection<Pair<Int, Long>> {
+fun loadOffsets(connection: MutableMap<String, String>, topic: String) : Collection<Pair<Int, Long>>? {
     return withConsumer(connection, topic) {consumer ->
         consumer.endOffsets(consumer.listTopics()[topic]?.map { TopicPartition(it.topic(), it.partition()) })
                 .map {it.key.partition() to it.value}
     }
 }
 
-inline fun <T> withConsumer(connection: Map<String, String>, topic: String, consume : (KafkaConsumer<ByteArray, ByteArray>) -> T): T {
+inline fun <T> withConsumer(connection: Map<String, String>, topic: String, consume : (KafkaConsumer<ByteArray, ByteArray>) -> T): T? {
     val props = mutableMapOf<String, Any>()
     props.putAll(connection)
 
@@ -42,20 +44,27 @@ inline fun <T> withConsumer(connection: Map<String, String>, topic: String, cons
     LOG.info("Reading offsets:$connection")
     val consumer = KafkaConsumer<ByteArray, ByteArray>(props as Map<String, Any>)
     consumer.subscribe(listOf(topic))
-
-    val result = consume(consumer)
-
-    consumer.unsubscribe()
-    consumer.close()
-    return result
+    return try {
+        consume(consumer)
+    } catch (e: IllegalStateException) {
+        info("Communication error $e")
+        null
+    } finally {
+        consumer.unsubscribe()
+        consumer.close()
+    }
 }
 
-fun flush(futures: Collection<Future<RecordMetadata>>): Int {
+fun flush(futures: Collection<Future<RecordMetadata>>, progress: ProgressIndicator): Int {
     var failed = 0
     futures.forEach { f ->
         try {
             f.get()
         } catch (e: ExecutionException) {
+            if (!progress.isCanceled) {
+                progress.cancel()
+            }
+            notify("publish failed:$e")
             failed++
             LOG.info("publish failed:$e")
         }
@@ -105,7 +114,7 @@ fun copy(source: MutableMap<String, String>, sourceTopic: String, dest: MutableM
                 }
                 if (processed > 0 && processed % 1000 == 0) {
                     notify("$processed records republished")
-                    val failed = flush(futures)
+                    val failed = flush(futures, progress)
                     if (failed > 0) {
                         notify("$failed records failed to be republish, check logs...")
                     }
@@ -114,7 +123,7 @@ fun copy(source: MutableMap<String, String>, sourceTopic: String, dest: MutableM
                 futures.add(producer.send(ProducerRecord<ByteArray, ByteArray>(destTopic, it.key(), it.value())))
                 processed++
             }
-            flush(futures)
+            flush(futures, progress)
             notify("Copy finished. Total $processed records republished")
         }
     }
@@ -158,7 +167,7 @@ fun search(connection: MutableMap<String, String>, topic: String, keyPattern: St
                 return
             }
             if (valueRegexp.matches(String(it.value())) && keyRegexp.matches(String(it.key())) ) {
-                notify("key:${String(it.key())}, partition:${it.partition()}, offset:${it.offset()}, message:${String(it.value())}\n")
+                notify("key:${String(it.key())}, partition:${it.partition()}, offset:${it.offset()}, message:${format(it.value())}\n")
                 found = true
             }
         }
@@ -221,6 +230,8 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
                 f.get()
                 futures++
             } catch (e: ExecutionException) {
+                notify("Cannot republish ${e}")
+                progress.cancel()
                 failures++
                 LOG.info("publish failed:$e")
             }
@@ -234,13 +245,33 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
 }
 
 fun produceSingleMessage(producer: KafkaProducer<ByteArray, ByteArray>, topic: String, key: String, value: ByteArray) {
-    producer.send(ProducerRecord<ByteArray, ByteArray>(topic, key.toByteArray(), value)).get()
-    notify("Published $key")
+    try {
+        producer.send(ProducerRecord<ByteArray, ByteArray>(topic, key.toByteArray(), value)).get()
+        notify("Published $key")
+    } catch (e: ExecutionException) {
+        notify("Publish failed: $e")
+    }
 }
 
 fun notify(log: String) {
     LOG.info(log)
-    Notifications.Bus.notify(Notification("Kafkalytic", "Kafkalytic", log, NotificationType.INFORMATION))
+    foreground {
+        Notifications.Bus.notify(Notification("Kafkalytic", "Kafkalytic", log, NotificationType.INFORMATION))
+    }
 }
 
-val KAFKA_COMPRESSION_TYPES = arrayOf("uncompressed", "gzip", "snappy", "lz4", "zstd")
+fun format(s: Any) : String {
+    val value = when (s) {
+        is String -> s
+        is ByteArray -> String(s)
+        else -> s.toString()
+    }
+    return try {
+        val gson = GsonBuilder().setPrettyPrinting().create()
+        gson.toJson(gson.fromJson(value, Map::class.java))
+    } catch (e: JsonSyntaxException) {
+        value
+    }
+}
+
+val KAFKA_COMPRESSION_TYPES = arrayOf("none", "gzip", "snappy", "lz4", "zstd")
