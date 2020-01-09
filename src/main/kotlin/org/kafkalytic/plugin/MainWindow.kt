@@ -22,6 +22,7 @@ import java.awt.event.ActionEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.File
+import java.lang.IllegalStateException
 import java.util.*
 import java.util.regex.Pattern
 import javax.swing.*
@@ -85,15 +86,6 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         tree.addTreeSelectionListener {
             it?.newLeadSelectionPath?.lastPathComponent?.let {node ->
                 LOG.info("selection changed:$node")
-                if (node is KRootTreeNode) {
-                    if (node.clusterProperties[ZOOKEEPER_PROPERTY].isNullOrBlank() && config.config["zookeeper_tip"] == null) {
-                        info("""
-                            |Did you know that you can set Zookeeper url in cluster properties, 
-                            |press refresh and see additional topic configuration
-                            """.trimMargin())
-                        config.config["zookeeper_tip"] = "shown"
-                    }
-                }
                 propsSplit.bottomComponent = if (node is KTopicTreeNode) {
                     JBScrollPane(topicTable)
                 } else {

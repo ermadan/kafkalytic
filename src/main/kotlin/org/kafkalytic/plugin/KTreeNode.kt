@@ -1,11 +1,10 @@
 package org.kafkalytic.plugin
 
-import com.google.gson.Gson
 import com.intellij.openapi.diagnostic.Logger
 import org.apache.kafka.clients.admin.*
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.TopicPartition
-import org.apache.zookeeper.KeeperException
+import org.apache.kafka.common.config.ConfigResource
 import java.util.concurrent.ExecutionException
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.MutableTreeNode
@@ -13,7 +12,6 @@ import javax.swing.tree.MutableTreeNode
 const val BROKERS = "Brokers"
 const val TOPICS = "Topics"
 const val CONSUMERS = "Consumers"
-const val ZOOKEEPER_PROPERTY = "zookeeper"
 
 
 interface KafkaTableNode {
@@ -69,25 +67,6 @@ abstract class KafkaTreeNode(userObject: Any) : DefaultMutableTreeNode(userObjec
 
 class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTreeNode(clusterProperties) {
     var client: AdminClient? = null
-    init {
-        if (clusterProperties[ZOOKEEPER_PROPERTY] == null) {
-            clusterProperties[ZOOKEEPER_PROPERTY] = "" //migration onto schema with zk
-        }
-    }
-
-    fun getZkData(topic: String): ByteArray? {
-        val url = clusterProperties[ZOOKEEPER_PROPERTY]
-        if (!url.isNullOrBlank()) {
-            val split = url.split("/")
-            val path = if (split.size > 1) {
-                "/" + split.subList(1, split.size).joinToString ("/")
-            } else {
-                ""
-            }
-            return ZkUtils.getData(split[0], "$path/config/topics/$topic")
-        }
-        return null
-    }
 
     override fun expand() {
         if (client == null) {
@@ -132,7 +111,13 @@ class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTr
         object : KafkaTreeNode(BROKERS) {
             override fun readChildren(client: AdminClient) =
                 client.describeCluster().nodes().get().map {
-                    DefaultMutableTreeNode(it.idString() + " (" + it.host() + ":" + it.port() + ")")
+                    object : DefaultMutableTreeNode(it.idString() + " (" + it.host() + ":" + it.port() + ")"), KafkaTableNode {
+                        override fun headers() = listOf("Property", "Value")
+                        override fun rows() = client?.describeConfigs(listOf(ConfigResource(ConfigResource.Type.BROKER,it.idString())))
+                                ?.all()?.get()?.values?.first()?.entries()?.sortedBy { it.name() }
+                                ?.map {configEntry ->  arrayOf(configEntry.name().toString(), configEntry.value()?:"")}
+                                ?:emptyList()
+                    }
                 }
         },
         object : KafkaTreeNode(CONSUMERS) {
@@ -179,14 +164,28 @@ class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMut
     }
 
     fun deleteRecords(offset: Long) {
-        cluster.client?.deleteRecords(getPartitions().map {
+        val result = cluster.client?.deleteRecords(getPartitions().map {
             TopicPartition(getTopicName(), it.partition()) to RecordsToDelete.beforeOffset(offset)
         }.toMap())
-        LOG.info("Removed records before $offset for topic ${getTopicName()}")
+        result?.lowWatermarks()?.entries?.forEach {
+            try {
+                notify("Partition ${it.key} messages deleted before ${it.value.get().lowWatermark()}")
+            } catch (e: Exception) {
+                notify("Partition ${it.key} error deleting messages $e")
+            }
+        }
+        LOG.info("Removal records before $offset for topic ${getTopicName()} complete")
     }
 
     fun setPartitions(partitions: Int) {
         cluster.client?.createPartitions(mapOf(getTopicName() to NewPartitions.increaseTo(partitions)))
+                ?.values()?.entries?.forEach {
+            try {
+                notify("Partition for topic ${it.key} created")
+            } catch (e: Exception) {
+                notify("Partition for topic ${it.key} not created: $e")
+            }
+        }
         LOG.info("Partitions for topic ${getTopicName()} changed to $partitions")
     }
 
@@ -217,9 +216,7 @@ class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMut
         )
     }
 
-
-    fun zooPropValues() = cluster.getZkData(getTopicName())?.let {
-        (Gson().fromJson(String(it), Map::class.java).get("config") as Map<String, Any>)?.map {(k, v) -> arrayOf(k.toString(), v.toString())}
-    }
+    fun zooPropValues() = cluster.client?.describeConfigs(listOf(ConfigResource(ConfigResource.Type.TOPIC,
+            getTopicName())))?.all()?.get()?.values?.first()?.entries()?.sortedBy { it.name() }?.map {arrayOf(it.name().toString(), it.value()?:"")}
 }
 

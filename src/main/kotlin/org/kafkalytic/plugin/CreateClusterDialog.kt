@@ -34,7 +34,6 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
 
     private val LOG = Logger.getInstance(this::class.java)
     private lateinit var name: JTextField
-    private lateinit var zoo: JTextField
     private lateinit var tableModel: DefaultTableModel
     private lateinit var trustPath: JTextField
     private lateinit var keyPath: JTextField
@@ -61,26 +60,9 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         testConnection.addActionListener {
             try {
                 AdminClient.create(getCluster() as Map<String, Any>).close()
-                if (zoo.text.isNullOrBlank()) {
-                    info("Connection successful")
-                }
+                info("Connection successful")
             } catch (e: KafkaException) {
                 info("Cannot connect to Kafka cluster. $e")
-            }
-            if (!zoo.text.isNullOrBlank()) {
-                val split = zoo.text.trim().split("/")
-                try {
-                    val zoo = ZkUtils.getZk(split[0])
-                    val zoopath = "/" + split.subList(1, split.size).joinToString ("/")
-                    if (zoo.exists(zoopath, false) == null) {
-                        info("Path $zoopath not found.")
-                    } else {
-                        info("Connection successful")
-                    }
-                    zoo.close()
-                } catch (e: IOException) {
-                    info("Cannot connect to Zookeeper cluster. $e")
-                }
             }
         }
         browse.addActionListener {
@@ -101,14 +83,12 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         val subPanel = JPanel(BorderLayout())
         subPanel.add(layoutLR(JLabel("Cluster name (optional)"), name), BorderLayout.NORTH)
         val certSubPanel = JPanel(GridLayout(0, 2))
-        zoo = HintTextField("host1:port/path_to_kafka_namespace")
         trustPath = HintTextField("local path")
         keyPath = HintTextField("local path")
         trustPassword = JTextField()
         keyPassword = JTextField()
         requestTimeout = JTextField("5000")
         requestTimeout.inputVerifier = INT_VERIFIER
-        certSubPanel.addLabelled("zookeeper (enables topic configs, optional)", zoo)
         certSubPanel.addLabelled("Truststore path", trustPath)
         certSubPanel.addLabelled("Truststore password", trustPassword)
         certSubPanel.addLabelled("Keystore path", keyPath)
@@ -131,7 +111,6 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         if (requestTimeout.text.isNotBlank()) {
             props.put("request.timeout.ms", requestTimeout.text)
         }
-        props.put(ZOOKEEPER_PROPERTY, zoo.text.trim())
         if (trustPath.text.isNotBlank()) {
             props.putAll(mapOf(
                     "security.protocol" to "SSL",
