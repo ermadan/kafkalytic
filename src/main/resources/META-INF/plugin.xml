@@ -8,8 +8,13 @@
         &lt;ul&gt;
         &lt;li&gt;Multiple clusters support&lt;/li&gt;
         &lt;li&gt;Topics management: create/delete/change partitions&lt;/li&gt;
+        &lt;li&gt;Display system topics&lt;/li&gt;
         &lt;li&gt;Search topics with regexp&lt;/li&gt;
         &lt;li&gt;Publish String/Byte serialized messages&lt;/li&gt;
+        &lt;li&gt;Bulk message generator with pattern&lt;/li&gt;
+        &lt;li&gt;Copy topic messages into another topic/cluster&lt;/li&gt;
+        &lt;li&gt;Delete messages from topic&lt;/li&gt;
+        &lt;li&gt;Search topic for specific pattern in key or value&lt;/li&gt;
         &lt;li&gt;Consume messages with different strategies
             &lt;ul&gt;
                 &lt;li&gt;wait for messages within specified poll time&lt;/li&gt;

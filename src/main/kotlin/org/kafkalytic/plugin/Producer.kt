@@ -13,7 +13,7 @@ import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.apache.kafka.common.serialization.StringSerializer
 
-class Producer(project: Project, val topic: String, val props: Properties, val key: String, val value: ByteArray)
+class Producer(project: Project, val topic: String, val config: Map<String, String>, val key: String, val value: ByteArray, val compression: String)
     : Task.Backgroundable(project, "Consume from $topic", true) {
     private val LOG = Logger.getInstance(this::class.java)
 
@@ -22,12 +22,13 @@ class Producer(project: Project, val topic: String, val props: Properties, val k
     }
 
     fun run() {
+        val props = config.toProperties()
         props.put("acks", "all");
         props.put("retries", 0);
         props.put("batch.size", 16384);
         props.put("linger.ms", 0);
         props.put("buffer.memory", 33554432);
-        props.put("compression.type", "none");
+        props.put("compression.type", compression);
         props.put("key.serializer", StringSerializer::class.java)
         props.put("value.serializer", ByteArraySerializer::class.java)
         props.put("max.request.size", 15728640);

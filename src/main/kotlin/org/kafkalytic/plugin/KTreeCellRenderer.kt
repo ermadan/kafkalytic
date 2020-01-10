@@ -22,7 +22,7 @@ class KTreeCellRenderer() : ColoredTreeCellRenderer() {
         if (node is DefaultMutableTreeNode
                 && (node.userObject == BROKERS || node.userObject == TOPICS) ) {
             append(node.toString(), SimpleTextAttributes.REGULAR_ATTRIBUTES)
-            if ((node as DefaultMutableTreeNode).childCount == 0) {
+            if (node.childCount == 0) {
                 append(" loading...", SimpleTextAttributes.GRAY_ITALIC_ATTRIBUTES)
             }
         } else {
