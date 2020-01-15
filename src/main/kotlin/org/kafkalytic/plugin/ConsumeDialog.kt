@@ -1,6 +1,8 @@
 package org.kafkalytic.plugin
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
 import org.apache.kafka.common.serialization.*
@@ -8,12 +10,14 @@ import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension
 import java.awt.GridLayout
+import java.nio.file.Paths
 import javax.swing.*
+import javax.swing.border.Border
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ChangeListener
 
 
-class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
+class ConsumeDialog(topic: String, val config: KafkaStateComponent) : DialogWrapper(false), ChangeListener {
     private val LOG = Logger.getInstance(this::class.java)
 
     private lateinit var waitFor : JTextField
@@ -24,6 +28,7 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
     private lateinit var keyDeserializer: JComboBox<String>
     private lateinit var valueDeserializer: JComboBox<String>
     private lateinit var radios: List<JRadioButton>
+    private lateinit var printOptionsPanel: PrintOptionsPanel
     override fun stateChanged(e: ChangeEvent?) {
         waitFor.isEnabled = radios[0].isSelected
         polls.isEnabled = radios[0].isSelected
@@ -39,12 +44,6 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
     }
 
     override fun createCenterPanel(): JPanel {
-        val certPanel = JPanel(BorderLayout())
-
-        val gridLayout = GridLayout(0, 2)
-        gridLayout.hgap = 2
-        gridLayout.vgap = 2
-        val deserizalizerSubPanel = JPanel(gridLayout)
         val deserializers = arrayOf(StringDeserializer::class.java,
                 ByteArrayDeserializer::class.java,
                 IntegerDeserializer::class.java,
@@ -54,12 +53,13 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
         keyDeserializer.preferredSize = Dimension(40, 24)
         valueDeserializer = ComboBox(deserializers)
         valueDeserializer.preferredSize = Dimension(40, 24)
-        deserizalizerSubPanel.add(JLabel("Key deserializer"))
-        deserizalizerSubPanel.add(keyDeserializer)
-        deserizalizerSubPanel.add(JLabel("Value deserializer"))
-        deserizalizerSubPanel.add(valueDeserializer)
+        val gridLayout = GridLayout(0, 2)
+        val deserizalizerSubPanel = JPanel(gridLayout)
+        gridLayout.hgap = 2
+        gridLayout.vgap = 2
+        deserizalizerSubPanel.addLabelled("Key deserializer", keyDeserializer)
+        deserizalizerSubPanel.addLabelled("Value deserializer", valueDeserializer)
         deserizalizerSubPanel.border = BorderFactory.createLineBorder(Color.GRAY, 1, true)
-        certPanel.add(deserizalizerSubPanel, BorderLayout.CENTER)
 
         val methodSubPanel = JPanel(GridLayout(3, 5))
         radios = arrayOf("Wait for ", "Recent ", "Specific message at ").map { JRadioButton(it) }
@@ -84,7 +84,6 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
         offset = JTextField()
         methodSubPanel.add(offset)
         methodSubPanel.add(JLabel(" offset"))
-        certPanel.add(methodSubPanel, BorderLayout.SOUTH)
         val radioGroup = ButtonGroup()
         radios.forEach {
             radioGroup.add(it)
@@ -92,8 +91,9 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
         }
         radios[1].isSelected = true
         stateChanged(null)
+        printOptionsPanel = PrintOptionsPanel(config)
 
-        return certPanel
+        return layoutUD(deserizalizerSubPanel, methodSubPanel, printOptionsPanel)
     }
 
     fun getKeyDeserializer()= "org.apache.kafka.common.serialization." + keyDeserializer.selectedItem
@@ -104,5 +104,8 @@ class ConsumeDialog(topic: String) : DialogWrapper(false), ChangeListener {
     fun getWaitFor() = if (radios[0].isSelected) waitFor.text.toInt() else 0
     fun getPolls() = if (radios[0].isSelected) polls.text.toInt() else 0
     fun getMode() = if (radios[0].isSelected) 0 else if (radios[1].isSelected) 1 else 2
+    fun getPrintToEvent() = printOptionsPanel.printToEvent.isSelected
+    fun getPrintToFile() = printOptionsPanel.printToFile.isSelected
+    fun getPrintToFileName() = printOptionsPanel.file.text
 }
 

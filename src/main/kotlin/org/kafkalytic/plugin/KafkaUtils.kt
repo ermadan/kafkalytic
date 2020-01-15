@@ -19,6 +19,9 @@ import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import java.lang.IllegalStateException
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import java.time.Duration
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
@@ -156,7 +159,7 @@ inline fun <T> withConsumer(connection: Map<String, String>, topic: String, time
 }
 
 fun search(connection: MutableMap<String, String>, topic: String, keyPattern: String, valuePattern: String,
-           timestamp: Long, cancelableTask: ProgressIndicator) {
+           timestamp: Long, cancelableTask: ProgressIndicator, config: KafkaStateComponent) {
     var found = false
     withConsumer(connection, topic, timestamp) { consumer, endOffsets ->
         val valueRegexp = Regex(".*$valuePattern.*")
@@ -167,7 +170,7 @@ fun search(connection: MutableMap<String, String>, topic: String, keyPattern: St
                 return
             }
             if (valueRegexp.matches(String(it.value())) && keyRegexp.matches(String(it.key())) ) {
-                notify("key:${String(it.key())}, partition:${it.partition()}, offset:${it.offset()}, message:${format(it.value())}\n")
+                printMessage(config, it)
                 found = true
             }
         }
@@ -260,7 +263,7 @@ fun notify(log: String) {
     }
 }
 
-fun format(s: Any) : String {
+fun <T> format(s: T) : String {
     val value = when (s) {
         is String -> s
         is ByteArray -> String(s)
@@ -272,6 +275,16 @@ fun format(s: Any) : String {
     } catch (e: JsonSyntaxException) {
         value
     }
+}
+
+fun <K, V> printMessage(config: KafkaStateComponent, record: ConsumerRecord<K, V>) {
+    if (config.config["printToFileSelected"]?.toBoolean() ?: false) {
+        Files.write(Paths.get(config.config["printToFile"].toString()), format(record.value()).toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
+    }
+    Notifications.Bus.notify(Notification("Kafkalytic", "topic:${record.topic()}",
+            "key:${format(record.key())}, partition:${record.partition()}, offset:${record.offset()}" +
+                    if (config.config["printToEventSelected"]?.toBoolean() ?: true) ", message:\n${format(record.value())}" else "",
+            NotificationType.INFORMATION))
 }
 
 val KAFKA_COMPRESSION_TYPES = arrayOf("none", "gzip", "snappy", "lz4", "zstd")

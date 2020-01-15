@@ -11,7 +11,7 @@ class KafkaStateComponent : PersistentStateComponent<KafkaStateComponent> {
     private val LOG = Logger.getInstance("KafkaStateComponent")
 
     var clusters : MutableMap<String, MutableMap<String, String>> = mutableMapOf()
-    var config = mutableMapOf<String, Any>()
+    var config = mutableMapOf<String, String>()
 
     fun addCluster(c: Map<String, String>) {
         val cluster = c.toMutableMap()
@@ -24,7 +24,7 @@ class KafkaStateComponent : PersistentStateComponent<KafkaStateComponent> {
     }
 
     override fun getState(): KafkaStateComponent {
-        LOG.info("Save state:$clusters")
+        LOG.info("Save state:$this")
         return this
     }
 
@@ -38,7 +38,7 @@ class KafkaStateComponent : PersistentStateComponent<KafkaStateComponent> {
     }
 
     override fun toString(): String {
-        return clusters.toString()
+        return clusters.toString() + config.toString()
     }
 
 //    fun getClusters() : List<Map<String, String>> {

@@ -6,12 +6,17 @@ import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.Notifications
 import com.intellij.openapi.progress.ProgressIndicator
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.ConsumerRecords
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.TopicPartition
+import java.nio.file.Files
+import java.nio.file.OpenOption
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import java.time.Duration
 
-fun consume(topic: String, props: Map<String, Any>, dialog: ConsumeDialog, progress: ProgressIndicator) {
+fun consume(topic: String, props: Map<String, Any>, dialog: ConsumeDialog, progress: ProgressIndicator, config: KafkaStateComponent) {
     val local = props.toMutableMap()
 
     local.put("group.id", "kafkalytic")
@@ -27,7 +32,7 @@ fun consume(topic: String, props: Map<String, Any>, dialog: ConsumeDialog, progr
     when (dialog.getMode()) {
         0 -> {
             consumer.subscribe(listOf(topic))
-            consume(consumer, topic, dialog.getWaitFor(), dialog.getPolls(), progress)
+            consume(consumer, dialog.getWaitFor(), dialog.getPolls(), progress, config)
         }
         1 -> {
             consumer.subscribe(listOf(topic))
@@ -38,20 +43,20 @@ fun consume(topic: String, props: Map<String, Any>, dialog: ConsumeDialog, progr
             endOffsets.forEach{ (partition, offset) ->
                 consumer.seek(partition, if (dialog.getDecrement() > offset) 0 else offset - dialog.getDecrement())
             }
-            consume(consumer, topic, dialog.getDecrement() * endOffsets.size, 5,progress)
+            consume(consumer, dialog.getDecrement() * endOffsets.size, 5,progress, config)
         }
         2 -> {
             val partitions = consumer.partitionsFor(topic)
             consumer.assign(partitions.filter { it.partition() == dialog.getPartition() }
                     .map { TopicPartition(topic, it.partition())})
             consumer.seek(TopicPartition(topic, dialog.getPartition()), dialog.getOffset())
-            consume(consumer, topic, 1, 5,  progress)
+            consume(consumer, 1, 5,  progress, config)
         }
     }
     consumer.unsubscribe()
 }
 
-private fun consume(consumer: KafkaConsumer<Any, Any>, topic: String, howMany : Int, polls: Int, progress: ProgressIndicator) {
+private fun consume(consumer: KafkaConsumer<Any, Any>, howMany : Int, polls: Int, progress: ProgressIndicator, config: KafkaStateComponent) {
     var consumed = 0
     repeat(polls) { _ ->
         if (progress.isCanceled) {
@@ -60,15 +65,13 @@ private fun consume(consumer: KafkaConsumer<Any, Any>, topic: String, howMany : 
         val records = consumer.poll(Duration.ofSeconds(3)) as ConsumerRecords<Any, Any>
         // Handle new records
         LOG.info("polling:" + records.count())
-        records.forEach {
-            Notifications.Bus.notify(Notification("Kafkalytic", "topic:$topic",
-                    "key:${it.key()}, partition:${it.partition()}, offset:${it.offset()}, message:\n${format(it.value())}",
-                    NotificationType.INFORMATION))
+        records.forEach {record ->
+             printMessage(config, record)
             consumed++
             if (consumed == howMany) {
                 return
             }
-            LOG.info("Consumed:$it.key()")
+            LOG.info("Consumed:${record.key()}")
         }
     }
 }

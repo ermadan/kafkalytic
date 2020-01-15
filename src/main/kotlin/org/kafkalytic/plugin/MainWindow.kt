@@ -175,19 +175,20 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                                 }
                             }
                             menu.add("Consume ") {
-                                val dialog = ConsumeDialog(topic)
+                                val dialog = ConsumeDialog(topic, config)
                                 if (dialog.showAndGet()) {
                                     background (it, longTaskQueue) { progress ->
-                                        consume(topic, connection, dialog,  progress)
+                                        consume(topic, connection, dialog,  progress, config)
                                     }
                                 }
                             }
                             menu.add("Search topic for the message ") {
-                                val dialog = SearchDialog(topic)
+                                val dialog = SearchDialog(topic, config)
                                 if (dialog.showAndGet()) {
                                     background (it + dialog.getValuePattern(), longTaskQueue) { progress ->
                                         search(connection, topic,
-                                                dialog.getKeyPattern(), dialog.getValuePattern(), dialog.getTimestamp(), progress)
+                                                dialog.getKeyPattern(), dialog.getValuePattern(), dialog.getTimestamp(),
+                                                progress, config)
                                     }
                                 }
                             }

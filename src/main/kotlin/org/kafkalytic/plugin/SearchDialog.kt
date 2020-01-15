@@ -8,10 +8,11 @@ import javax.swing.*
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ChangeListener
 
-class SearchDialog(topic: String) : DialogWrapper(false) {
+class SearchDialog(topic: String, val config: KafkaStateComponent) : DialogWrapper(false) {
     private lateinit var valuePattern: JTextField
     private lateinit var keyPattern: JTextField
     private lateinit var timestampPanel: TimestampPanel
+    private lateinit var printOptionsPanel: PrintOptionsPanel
 
     init {
         title = "Configure Kafka search for topic $topic"
@@ -24,6 +25,7 @@ class SearchDialog(topic: String) : DialogWrapper(false) {
         null
     }
 
+
     override fun createCenterPanel(): JPanel {
         valuePattern = HintTextField("regexp")
         valuePattern.preferredSize = Dimension(200, 24)
@@ -32,9 +34,12 @@ class SearchDialog(topic: String) : DialogWrapper(false) {
 
         timestampPanel = TimestampPanel()
 
+        printOptionsPanel = PrintOptionsPanel(config)
+
         return layoutUD(timestampPanel,
-                layoutLR(JLabel("Value search pattern"), valuePattern),
-                layoutLR(JLabel("Key search pattern"), keyPattern))
+                layoutUD(layoutLR(JLabel("Value search pattern"), valuePattern),
+                layoutLR(JLabel("Key search pattern"), keyPattern)),
+                printOptionsPanel)
     }
 
     class TimestampPanel : JPanel(), ChangeListener {
@@ -83,4 +88,8 @@ class SearchDialog(topic: String) : DialogWrapper(false) {
     fun getKeyPattern() = keyPattern.text
     fun getValuePattern() = valuePattern.text
     fun getTimestamp() = timestampPanel.getTimestamp()
+    fun getPrintToEvent() = printOptionsPanel.printToEvent.isSelected
+    fun getPrintToFile() = printOptionsPanel.printToFile.isSelected
+    fun getPrintToFileName() = printOptionsPanel.file.text
+
 }
