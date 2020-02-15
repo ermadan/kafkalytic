@@ -97,12 +97,18 @@ class HintTextField(private val _hint: String) : JTextField() {
 class PrintOptionsPanel(config: KafkaStateComponent) : JPanel(BorderLayout()) {
     val printToEvent: JCheckBox
     val printToFile: JCheckBox
+    val printToEditor: JCheckBox
     val file = JTextField(config.config["printToFile"] ?: Paths.get(System.getProperty("user.dir"), "kafkalytic-messages.txt").toString())
     init {
+        printToEditor = JCheckBox("Print message payload to Editor window", null, config.config["printToEditorSelected"]?.toBoolean() ?: true)
         printToEvent = JCheckBox("Print message payload to EventLog window", null, config.config["printToEventSelected"]?.toBoolean() ?: true)
         val printToFileSelected = config.config["printToFileSelected"]?.toBoolean() ?: false
         printToFile = JCheckBox("Print message payload to file", null, printToFileSelected)
         file.isEnabled = printToFileSelected
+        printToEditor.addActionListener {
+            config.config["printToEditorSelected"] = printToEditor.isSelected.toString()
+            LOG.info("printToEditorSelected: " + config.config["printToEditorSelected"])
+        }
         printToFile.addActionListener {
             file.isEnabled = printToFile.isSelected
             config.config["printToFileSelected"] = printToFile.isSelected.toString()
@@ -115,7 +121,7 @@ class PrintOptionsPanel(config: KafkaStateComponent) : JPanel(BorderLayout()) {
         file.addActionListener {
             config.config["printToFile"] = file.text
         }
-        add(layoutUD(printToEvent, printToFile, layoutLR(JLabel("File to print"), file)), BorderLayout.SOUTH)
+        add(layoutUD(layoutUD(printToEditor, printToEvent), printToFile, layoutLR(JLabel("File to print"), file)), BorderLayout.SOUTH)
     }
 }
 

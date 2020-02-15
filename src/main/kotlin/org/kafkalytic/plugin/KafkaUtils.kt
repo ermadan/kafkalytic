@@ -159,7 +159,7 @@ inline fun <T> withConsumer(connection: Map<String, String>, topic: String, time
 }
 
 fun search(connection: MutableMap<String, String>, topic: String, keyPattern: String, valuePattern: String,
-           timestamp: Long, cancelableTask: ProgressIndicator, config: KafkaStateComponent) {
+           timestamp: Long, cancelableTask: ProgressIndicator, win: MainWindow) {
     var found = false
     withConsumer(connection, topic, timestamp) { consumer, endOffsets ->
         val valueRegexp = Regex(".*$valuePattern.*")
@@ -170,7 +170,7 @@ fun search(connection: MutableMap<String, String>, topic: String, keyPattern: St
                 return
             }
             if (valueRegexp.matches(String(it.value())) && keyRegexp.matches(String(it.key())) ) {
-                printMessage(config, it)
+                win.printMessage(it)
                 found = true
             }
         }
@@ -261,30 +261,6 @@ fun notify(log: String) {
     foreground {
         Notifications.Bus.notify(Notification("Kafkalytic", "Kafkalytic", log, NotificationType.INFORMATION))
     }
-}
-
-fun <T> format(s: T) : String {
-    val value = when (s) {
-        is String -> s
-        is ByteArray -> String(s)
-        else -> s.toString()
-    }
-    return try {
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        gson.toJson(gson.fromJson(value, Map::class.java))
-    } catch (e: JsonSyntaxException) {
-        value
-    }
-}
-
-fun <K, V> printMessage(config: KafkaStateComponent, record: ConsumerRecord<K, V>) {
-    if (config.config["printToFileSelected"]?.toBoolean() ?: false) {
-        Files.write(Paths.get(config.config["printToFile"].toString()), format(record.value()).toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
-    }
-    Notifications.Bus.notify(Notification("Kafkalytic", "topic:${record.topic()}",
-            "key:${format(record.key())}, partition:${record.partition()}, offset:${record.offset()}" +
-                    if (config.config["printToEventSelected"]?.toBoolean() ?: true) ", message:\n${format(record.value())}" else "",
-            NotificationType.INFORMATION))
 }
 
 val KAFKA_COMPRESSION_TYPES = arrayOf("none", "gzip", "snappy", "lz4", "zstd")
