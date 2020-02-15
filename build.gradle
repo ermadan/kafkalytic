@@ -18,7 +18,7 @@ apply plugin: 'org.jetbrains.intellij'
 apply plugin: 'java'
 
 group 'org.ermadan'
-version '0.8.9'
+version '0.8.10'
 
 apply plugin: 'kotlin'
 
@@ -48,6 +48,5 @@ intellij {
 }
 patchPluginXml {
     changeNotes """
-        Implemented toolbar search 
-        fixed bug with node instance"""
+        Save to file implemented, option to switch off printing to event panel"""
 }

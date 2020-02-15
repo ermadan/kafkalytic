@@ -3,12 +3,10 @@ package org.kafkalytic.plugin
 import com.intellij.openapi.ui.InputValidator
 import com.intellij.ui.components.JBLabel
 import java.awt.*
+import java.nio.file.Paths
 import java.text.ParseException
 import java.text.SimpleDateFormat
-import javax.swing.InputVerifier
-import javax.swing.JComponent
-import javax.swing.JPanel
-import javax.swing.JTextField
+import javax.swing.*
 
 fun layoutLR(left: JComponent, right: JComponent?) : JPanel {
     val panel = JPanel(BorderLayout())
@@ -94,7 +92,36 @@ class HintTextField(private val _hint: String) : JTextField() {
             g.drawString(_hint, ins.left, h / 2 + fm.getAscent() / 2 - 2)
         }
     }
-
 }
 
+class PrintOptionsPanel(config: KafkaStateComponent) : JPanel(BorderLayout()) {
+    val printToEvent: JCheckBox
+    val printToFile: JCheckBox
+    val printToEditor: JCheckBox
+    val file = JTextField(config.config["printToFile"] ?: Paths.get(System.getProperty("user.dir"), "kafkalytic-messages.txt").toString())
+    init {
+        printToEditor = JCheckBox("Print message payload to Editor window", null, config.config["printToEditorSelected"]?.toBoolean() ?: true)
+        printToEvent = JCheckBox("Print message payload to EventLog window", null, config.config["printToEventSelected"]?.toBoolean() ?: true)
+        val printToFileSelected = config.config["printToFileSelected"]?.toBoolean() ?: false
+        printToFile = JCheckBox("Print message payload to file", null, printToFileSelected)
+        file.isEnabled = printToFileSelected
+        printToEditor.addActionListener {
+            config.config["printToEditorSelected"] = printToEditor.isSelected.toString()
+            LOG.info("printToEditorSelected: " + config.config["printToEditorSelected"])
+        }
+        printToFile.addActionListener {
+            file.isEnabled = printToFile.isSelected
+            config.config["printToFileSelected"] = printToFile.isSelected.toString()
+            LOG.info("printToFileSelected: " + config.config["printToFileSelected"])
+        }
+        printToEvent.addActionListener {
+            config.config["printToEventSelected"] = printToEvent.isSelected.toString()
+            LOG.info("printToEventSelected: " + config.config["printToEventSelected"])
+        }
+        file.addActionListener {
+            config.config["printToFile"] = file.text
+        }
+        add(layoutUD(layoutUD(printToEditor, printToEvent), printToFile, layoutLR(JLabel("File to print"), file)), BorderLayout.SOUTH)
+    }
+}
 

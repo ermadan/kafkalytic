@@ -19,6 +19,9 @@ import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import java.lang.IllegalStateException
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import java.time.Duration
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
@@ -156,7 +159,7 @@ inline fun <T> withConsumer(connection: Map<String, String>, topic: String, time
 }
 
 fun search(connection: MutableMap<String, String>, topic: String, keyPattern: String, valuePattern: String,
-           timestamp: Long, cancelableTask: ProgressIndicator) {
+           timestamp: Long, cancelableTask: ProgressIndicator, win: MainWindow) {
     var found = false
     withConsumer(connection, topic, timestamp) { consumer, endOffsets ->
         val valueRegexp = Regex(".*$valuePattern.*")
@@ -167,7 +170,7 @@ fun search(connection: MutableMap<String, String>, topic: String, keyPattern: St
                 return
             }
             if (valueRegexp.matches(String(it.value())) && keyRegexp.matches(String(it.key())) ) {
-                notify("key:${String(it.key())}, partition:${it.partition()}, offset:${it.offset()}, message:${format(it.value())}\n")
+                win.printMessage(it)
                 found = true
             }
         }
@@ -257,20 +260,6 @@ fun notify(log: String) {
     LOG.info(log)
     foreground {
         Notifications.Bus.notify(Notification("Kafkalytic", "Kafkalytic", log, NotificationType.INFORMATION))
-    }
-}
-
-fun format(s: Any) : String {
-    val value = when (s) {
-        is String -> s
-        is ByteArray -> String(s)
-        else -> s.toString()
-    }
-    return try {
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        gson.toJson(gson.fromJson(value, Map::class.java))
-    } catch (e: JsonSyntaxException) {
-        value
     }
 }
 

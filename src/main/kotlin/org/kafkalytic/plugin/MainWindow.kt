@@ -1,28 +1,40 @@
 package org.kafkalytic.plugin
 
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonSyntaxException
+import com.intellij.lang.Language
+import com.intellij.notification.Notification
+import com.intellij.notification.NotificationType
+import com.intellij.notification.Notifications
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.progress.BackgroundTaskQueue
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.IconLoader
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiFileFactory
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.ui.treeStructure.Tree
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import java.awt.BorderLayout
 import java.awt.event.ActionEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import java.io.File
-import java.lang.IllegalStateException
+import java.io.*
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import java.util.*
 import java.util.regex.Pattern
 import javax.swing.*
@@ -30,6 +42,11 @@ import javax.swing.event.DocumentEvent
 import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeExpansionListener
 import javax.swing.tree.*
+import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.transform.OutputKeys
+import javax.xml.transform.TransformerFactory
+import javax.xml.transform.dom.DOMSource
+import javax.xml.transform.stream.StreamResult
 
 class MainWindow(stateComponent: KafkaStateComponent, private val project: Project) : JPanel(BorderLayout()) {
     private val LOG = Logger.getInstance("Kafkalytic")
@@ -175,19 +192,20 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                                 }
                             }
                             menu.add("Consume ") {
-                                val dialog = ConsumeDialog(topic)
+                                val dialog = ConsumeDialog(topic, config)
                                 if (dialog.showAndGet()) {
                                     background (it, longTaskQueue) { progress ->
-                                        consume(topic, connection, dialog,  progress)
+                                        consume(topic, connection, dialog,  progress, this@MainWindow)
                                     }
                                 }
                             }
                             menu.add("Search topic for the message ") {
-                                val dialog = SearchDialog(topic)
+                                val dialog = SearchDialog(topic, config)
                                 if (dialog.showAndGet()) {
                                     background (it + dialog.getValuePattern(), longTaskQueue) { progress ->
                                         search(connection, topic,
-                                                dialog.getKeyPattern(), dialog.getValuePattern(), dialog.getTimestamp(), progress)
+                                                dialog.getKeyPattern(), dialog.getValuePattern(), dialog.getTimestamp(),
+                                                progress, this@MainWindow)
                                     }
                                 }
                             }
@@ -437,6 +455,62 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
     fun background(project: Project?, title: String, queue: BackgroundTaskQueue, task: (ProgressIndicator) -> Unit) {
         queue.run(CancelableTask(title, project, task))
     }
+
+    fun openEditor(name: String, content: String, language: String) {
+        val psiFileFromText: PsiFile = PsiFileFactory.getInstance(project).createFileFromText(name,
+                Language.findLanguageByID(language)!!, content, true, false)
+        FileEditorManager.getInstance(project).openFile(psiFileFromText.virtualFile, true)
+    }
+
+    private fun <T> format(s: T) : Pair<String, String> {
+        val value = when (s) {
+            is String -> s
+            is ByteArray -> String(s)
+            else -> s.toString()
+        }.trim()
+        return if (value.startsWith("{")) {
+                try {
+                    val gson = GsonBuilder().setPrettyPrinting().create()
+                    "JSON" to gson.toJson(gson.fromJson(value, Map::class.java))
+                } catch (e: JsonSyntaxException) {
+                    "TEXT" to value
+                }
+            } else if (value.startsWith("<")) {
+                try {
+                    val dbf = DocumentBuilderFactory.newInstance()
+                    val db = dbf.newDocumentBuilder()
+
+                    val transformer = TransformerFactory.newInstance().newTransformer()
+                    transformer.setOutputProperty(OutputKeys.INDENT, "yes")
+                    transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2")
+                    val result = StreamResult(StringWriter())
+                    val source = DOMSource(db.parse(ByteArrayInputStream(value.toByteArray())))
+                    transformer.transform(source, result)
+                    "XML" to result.getWriter().toString()
+                } catch (e: Exception) {
+                    "TEXT" to value
+                }
+            } else "TEXT" to value
+    }
+
+    fun <K, V> printMessage(record: ConsumerRecord<K, V>) {
+        foreground {
+            val (_, key) = format(record.key())
+            val (lang, value) =  format(record.value())
+
+            if (config.config["printToEditorSelected"]?.toBoolean() ?: true) {
+                    openEditor(key, value, lang)
+            }
+            if (config.config["printToFileSelected"]?.toBoolean() ?: false) {
+                Files.write(Paths.get(config.config["printToFile"]), value.toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
+            }
+            Notifications.Bus.notify(Notification("Kafkalytic", "topic:${record.topic()}",
+                    "key:$key, partition:${record.partition()}, offset:${record.offset()}" +
+                            if (config.config["printToEventSelected"]?.toBoolean() ?: true) ", message:\n$value" else "",
+                    NotificationType.INFORMATION))
+        }
+    }
+
 }
 
 fun foreground(task: () -> Unit) {
