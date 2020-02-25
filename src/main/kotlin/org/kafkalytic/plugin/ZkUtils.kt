@@ -1,6 +1,7 @@
 package org.kafkalytic.plugin
 
 import com.intellij.openapi.diagnostic.Logger
+import org.apache.zookeeper.KeeperException
 import org.apache.zookeeper.WatchedEvent
 import org.apache.zookeeper.Watcher
 import org.apache.zookeeper.ZooKeeper
@@ -40,6 +41,15 @@ object ZkUtils {
         }
         return zk
     }
+
+    fun getData(source: String, path: String) =
+        try {
+            getZk(source)?.getData(path, false, null)
+        } catch (e: KeeperException) {
+            LOG.info("KeeperException $e, retry")
+            disconnect(source)
+            getZk(source)?.getData(path, false, null)
+        }
 
     fun disconnect(source: String) {
         getZk(source).close()

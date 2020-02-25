@@ -7,16 +7,21 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.InputValidator
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.table.JBTable
-import java.awt.BorderLayout
+import org.apache.kafka.clients.admin.AdminClient
+import org.apache.kafka.common.KafkaException
+import java.awt.*
 import java.io.FileReader
+import java.io.IOException
 import java.util.*
-import javax.swing.*
-import javax.swing.event.TableModelEvent
-import javax.swing.event.TableModelListener
+import javax.swing.JButton
+import javax.swing.JLabel
+import javax.swing.JPanel
+import javax.swing.JTextField
 import javax.swing.table.DefaultTableModel
 
+
 class CreateClusterDialog(val project: Project) : Messages.InputDialog(
-        "Enter Kafka bootstrap server as host:port",
+        "Enter Kafka bootstrap servers as host:port,host2:port",
         "New cluster",
         Messages.getQuestionIcon(),
         null,
@@ -28,7 +33,14 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         }) {
 
     private val LOG = Logger.getInstance(this::class.java)
+    private lateinit var name: JTextField
     private lateinit var tableModel: DefaultTableModel
+    private lateinit var trustPath: JTextField
+    private lateinit var keyPath: JTextField
+    private lateinit var trustPassword: JTextField
+    private lateinit var keyPassword: JTextField
+    private lateinit var requestTimeout: JTextField
+
 
     override fun createMessagePanel(): JPanel {
         val messagePanel = JPanel(BorderLayout())
@@ -41,32 +53,74 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         tableModel.addColumn("Property")
         tableModel.addColumn("Value")
         tableModel.addTableModelListener {  }
-        myField = createTextFieldComponent()
+        myField = HintTextField("host1:port,host2:port")
         messagePanel.add(createScrollableTextComponent(), BorderLayout.CENTER)
         val browse = JButton("Load properties from file")
+        val testConnection = JButton("Test connection")
+        testConnection.addActionListener {
+            try {
+                AdminClient.create(getCluster() as Map<String, Any>).close()
+                info("Connection successful")
+            } catch (e: KafkaException) {
+                info("Cannot connect to Kafka cluster. $e")
+            }
+        }
         browse.addActionListener {
             val fcd = FileChooserDescriptor(true, false, false, false, false, false)
             val props = Properties()
-            props.load(FileReader(FileChooser.chooseFile(fcd, project, null)?.canonicalPath))
-            props.entries.forEach { tableModel.addRow(arrayOf(it.key, it.value)) }
-            if (props.containsKey("bootstrap.servers")) {
-                myField.text = props.getProperty("bootstrap.servers")
+            val file = FileChooser.chooseFile(fcd, project, null)
+            if (file != null) {
+                props.load(FileReader(file.canonicalPath))
+                props.entries.forEach { tableModel.addRow(arrayOf(it.key, it.value)) }
+                props.getProperty("bootstrap.servers")?.let { myField.text = it }
+                props.getProperty("ssl.truststore.location")?.let { trustPath.text = it }
+                props.getProperty("ssl.truststore.password")?.let { trustPassword.text = it }
+                props.getProperty("ssl.keystore.location")?.let { keyPath.text = it }
+                props.getProperty("ssl.keystore.password")?.let { keyPassword.text = it }
             }
         }
+        name = JTextField()
         val subPanel = JPanel(BorderLayout())
-        subPanel.add(browse, BorderLayout.NORTH)
-        subPanel.add(JBTable(tableModel), BorderLayout.CENTER)
+        subPanel.add(layoutLR(JLabel("Cluster name (optional)"), name), BorderLayout.NORTH)
+        val certSubPanel = JPanel(GridLayout(0, 2))
+        trustPath = HintTextField("local path")
+        keyPath = HintTextField("local path")
+        trustPassword = JTextField()
+        keyPassword = JTextField()
+        requestTimeout = JTextField("5000")
+        requestTimeout.inputVerifier = INT_VERIFIER
+        certSubPanel.addLabelled("Truststore path", trustPath)
+        certSubPanel.addLabelled("Truststore password", trustPassword)
+        certSubPanel.addLabelled("Keystore path", keyPath)
+        certSubPanel.addLabelled("Keystore password", keyPassword)
+        certSubPanel.addLabelled("Request timeout, ms", requestTimeout)
+        subPanel.add(certSubPanel, BorderLayout.CENTER)
+        subPanel.add(layoutUD(browse, JBTable(tableModel), testConnection), BorderLayout.SOUTH)
+
         messagePanel.add(subPanel, BorderLayout.SOUTH)
         return messagePanel
     }
 
-    fun getCluster(): Map<String, String> {
-        var props = tableModel.dataVector.elements().asSequence().map { val v = it as Vector<*>; v[0].toString() to v[1].toString() }.toMap()
-        if (!inputString.isNullOrEmpty()) {
-            props = props.toMutableMap()
-            props.put("bootstrap.servers", inputString.toString())
+    fun getCluster(): MutableMap<String, String> {
+        var props = tableModel.dataVector.elements().asSequence()
+                .map { val v = it as Vector<*>; v[0].toString() to v[1].toString() }.toMap().toMutableMap()
+        if (!myField.text.trim().isNullOrEmpty()) {
+            props.put("bootstrap.servers", myField.text.trim())
         }
-        LOG.info("coonection properties:" + props)
+        props.put("name", name.text.ifBlank { props["bootstrap.servers"]!! })
+        if (requestTimeout.text.isNotBlank()) {
+            props.put("request.timeout.ms", requestTimeout.text)
+        }
+        if (trustPath.text.isNotBlank()) {
+            props.putAll(mapOf(
+                    "security.protocol" to "SSL",
+                    "ssl.truststore.location" to trustPath.text,
+                    "ssl.truststore.password" to trustPassword.text,
+                    "ssl.keystore.location" to keyPath.text,
+                    "ssl.keystore.password" to keyPassword.text))
+        }
+
+        LOG.info("coonection properties:$props")
         return props
     }
 }

@@ -49,7 +49,7 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
             file.text = FileChooser.chooseFile(fcd, project, null)?.canonicalPath
         }
 
-        compression = ComboBox(arrayOf("none", "gzip", "snappy", "lz4", "zstd"))
+        compression = ComboBox(KAFKA_COMPRESSION_TYPES)
 
         val panel = JPanel(BorderLayout())
         panel.add(layoutLR(JBLabel("Key "), key), BorderLayout.NORTH)
@@ -67,23 +67,6 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
         radios[1].isSelected = true
         stateChanged(null)
 
-        return panel
-    }
-
-    private fun layoutLR(left: JComponent, right: JComponent) : JPanel {
-        val panel = JPanel(BorderLayout())
-        panel.add(left, BorderLayout.WEST)
-        if (right != null) {
-            panel.add(right, BorderLayout.CENTER)
-        }
-        return panel
-    }
-
-    private fun layoutUD(top: JComponent, center: JComponent, bottom: JComponent) : JPanel {
-        val panel = JPanel(BorderLayout())
-        panel.add(top, BorderLayout.NORTH)
-        panel.add(center, BorderLayout.CENTER)
-        panel.add(bottom, BorderLayout.SOUTH)
         return panel
     }
 
