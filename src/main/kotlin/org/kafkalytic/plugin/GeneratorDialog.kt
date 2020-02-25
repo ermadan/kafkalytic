@@ -65,7 +65,7 @@ class GeneratorDialog(val project: Project, topic: String) : DialogWrapper(false
         compression = ComboBox(KAFKA_COMPRESSION_TYPES)
 
         val panel = JPanel(GridLayout(0, 2))
-        panel.addLabelled("Number of message", numberOfMessages)
+        panel.addLabelled("Number of messages", numberOfMessages)
         panel.addLabelled("Delay", delay)
         panel.addLabelled("Batch size", batchSize)
         panel.addLabelled("Compression", compression)
