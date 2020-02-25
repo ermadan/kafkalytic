@@ -47,6 +47,7 @@ inline fun <T> withConsumer(connection: Map<String, String>, topic: String, cons
     LOG.info("Reading offsets:$connection")
     val consumer = KafkaConsumer<ByteArray, ByteArray>(props as Map<String, Any>)
     consumer.subscribe(listOf(topic))
+    LOG.info("Subscribed.")
     return try {
         consume(consumer)
     } catch (e: IllegalStateException) {
@@ -161,15 +162,18 @@ inline fun <T> withConsumer(connection: Map<String, String>, topic: String, time
 fun search(connection: MutableMap<String, String>, topic: String, keyPattern: String, valuePattern: String,
            timestamp: Long, cancelableTask: ProgressIndicator, win: MainWindow) {
     var found = false
+    notify("Searching for templates $keyPattern, $valuePattern in topic $topic")
     withConsumer(connection, topic, timestamp) { consumer, endOffsets ->
-        val valueRegexp = Regex(".*$valuePattern.*")
-        val keyRegexp = Regex(".*$keyPattern.*")
+        val valueRegexp = Regex(valuePattern)
+        val keyRegexp = Regex(keyPattern)
         readUpTo(consumer, endOffsets) {
             if (cancelableTask.isCanceled) {
                 LOG.info("Task cancelled")
                 return
             }
-            if (valueRegexp.matches(String(it.value())) && keyRegexp.matches(String(it.key())) ) {
+            LOG.info("Message:" + String(it.key()) + ":" + valueRegexp.matches(String(it.value())) + ":" + keyRegexp.matches(String(it.key())))
+            if ((valuePattern.isBlank() || valueRegexp.containsMatchIn(String(it.value())))
+                    && (keyPattern.isBlank() || keyRegexp.containsMatchIn(String(it.key())))) {
                 win.printMessage(it)
                 found = true
             }
@@ -179,6 +183,7 @@ fun search(connection: MutableMap<String, String>, topic: String, keyPattern: St
     if (!found) {
         notify("No messages found for patterns $keyPattern $valuePattern")
     }
+    notify("Search complete.")
     LOG.info("Reading offsets complete")
 }
 
@@ -233,6 +238,7 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
             try {
                 f.get()
                 futures++
+                LOG.info("published:" + futures)
             } catch (e: ExecutionException) {
                 notify("Cannot republish ${e}")
                 progress.cancel()
