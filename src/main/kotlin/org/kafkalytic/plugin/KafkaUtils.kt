@@ -224,6 +224,7 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
                 return@launch
             }
         }
+        channel.close()
     }
     var failures = 0
     var futures = 0
