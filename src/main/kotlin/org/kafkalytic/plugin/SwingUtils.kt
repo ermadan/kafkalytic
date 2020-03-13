@@ -1,17 +1,23 @@
 package org.kafkalytic.plugin
 
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.ui.InputValidator
+import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.components.JBLabel
 import java.awt.*
+import java.nio.file.Files
 import java.nio.file.Paths
 import java.text.ParseException
 import java.text.SimpleDateFormat
 import javax.swing.*
+import javax.swing.event.DocumentEvent
 
-fun layoutLR(left: JComponent, right: JComponent?) : JPanel {
+fun layoutLR(left: JComponent, center: JComponent? = null, right: JComponent? = null) : JPanel {
     val panel = JPanel(BorderLayout())
     panel.add(left, BorderLayout.WEST)
-    right?.let { panel.add(it, BorderLayout.CENTER) }
+    center?.let { panel.add(it, BorderLayout.CENTER) }
+    right?.let { panel.add(it, BorderLayout.EAST) }
     return panel
 }
 
@@ -104,7 +110,6 @@ class PrintOptionsPanel(config: KafkaStateComponent) : JPanel(BorderLayout()) {
         printToEvent = JCheckBox("Print message payload to EventLog window", null, config.config["printToEventSelected"]?.toBoolean() ?: true)
         val printToFileSelected = config.config["printToFileSelected"]?.toBoolean() ?: false
         printToFile = JCheckBox("Print message payload to file", null, printToFileSelected)
-        file.isEnabled = printToFileSelected
         printToEditor.addActionListener {
             config.config["printToEditorSelected"] = printToEditor.isSelected.toString()
             LOG.info("printToEditorSelected: " + config.config["printToEditorSelected"])
@@ -118,10 +123,21 @@ class PrintOptionsPanel(config: KafkaStateComponent) : JPanel(BorderLayout()) {
             config.config["printToEventSelected"] = printToEvent.isSelected.toString()
             LOG.info("printToEventSelected: " + config.config["printToEventSelected"])
         }
-        file.addActionListener {
-            config.config["printToFile"] = file.text
+        file.isEnabled = printToFileSelected
+        file.preferredSize = Dimension(200, 24)
+        file.document.addDocumentListener(object: DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent?) {
+                config.config["printToFile"] = file.text
+                LOG.info("path changed: " + config.config["printToFile"])
+            }
+        })
+        val browse = JButton("Browse")
+        browse.addActionListener{
+            val fcd = FileChooserDescriptor(true, true, false, false, false, false)
+            val fileName = FileChooser.chooseFile(fcd, null, null)?.canonicalPath
+            file.text = if (Files.isDirectory(Paths.get(fileName))) Paths.get(fileName, "kafkaMessages.txt").toString() else fileName
         }
-        add(layoutUD(layoutUD(printToEditor, printToEvent), printToFile, layoutLR(JLabel("File to print"), file)), BorderLayout.SOUTH)
+        add(layoutUD(layoutUD(printToEditor, printToEvent), printToFile, layoutLR(JLabel("File to print"), file, browse)), BorderLayout.SOUTH)
     }
 }
 
