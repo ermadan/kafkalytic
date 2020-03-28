@@ -211,7 +211,7 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
     GlobalScope.launch {
         // this might be heavy CPU-consuming computation or async logic, we'll just send five squares
         for (current in 1..messageNumber) {
-            if (current > 0 && current % (messageNumber / 100) == 0) {
+            if (current > 0 && messageNumber > 100 && (current % (messageNumber / 100)) == 0) {
                 notify("Produced $current messages for topic $topic")
             }
             if (delay > 0) {

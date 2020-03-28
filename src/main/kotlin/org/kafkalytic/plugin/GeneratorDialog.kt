@@ -42,7 +42,7 @@ class GeneratorDialog(val project: Project, topic: String) : DialogWrapper(false
         template.lineWrap = true
 
         numberOfMessages = JTextField("100")
-        numberOfMessages.setInputVerifier(INT_VERIFIER)
+        numberOfMessages.setInputVerifier(INT_NON_ZERO_VERIFIER)
         numberOfMessages.preferredSize = Dimension(200, 24)
 
         messageSize = JTextField("100")
@@ -66,7 +66,7 @@ class GeneratorDialog(val project: Project, topic: String) : DialogWrapper(false
 
         val panel = JPanel(GridLayout(0, 2))
         panel.addLabelled("Number of messages", numberOfMessages)
-        panel.addLabelled("Delay", delay)
+        panel.addLabelled("Delay ms", delay)
         panel.addLabelled("Batch size", batchSize)
         panel.addLabelled("Compression", compression)
         panel.addLabelled("Random part size", messageSize)

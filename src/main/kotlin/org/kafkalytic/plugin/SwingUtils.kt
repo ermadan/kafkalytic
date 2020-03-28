@@ -51,6 +51,17 @@ val INT_VERIFIER = object : InputVerifier() {
         }
     }
 }
+val INT_NON_ZERO_VERIFIER = object : InputVerifier() {
+    override fun verify(input: JComponent) : Boolean {
+        try {
+            with(Integer.parseInt((input as JTextField).text)) {
+                return this <= Int.MAX_VALUE && this > 0
+            }
+        } catch (e: NumberFormatException) {
+            return false
+        }
+    }
+}
 val LONG_VALIDATOR = object: InputValidator {
     override fun checkInput(inputString: String?) = true
     override fun canClose(inputString: String?) =
