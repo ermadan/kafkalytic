@@ -1,5 +1,8 @@
 package org.kafkalytic.plugin
 
+import com.intellij.notification.Notification
+import com.intellij.notification.NotificationType
+import com.intellij.notification.Notifications
 import com.intellij.openapi.components.ServiceManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
@@ -20,6 +23,12 @@ class KafkalyticToolWindowFactory : ToolWindowFactory {
             val symbols = formatter.decimalFormatSymbols
             symbols.groupingSeparator = ' '
             formatter.decimalFormatSymbols = symbols
+            notification = {
+                LOG.info(it)
+                foreground {
+                    Notifications.Bus.notify(Notification("Kafkalytic", "Kafkalytic", it, NotificationType.INFORMATION))
+                }
+            }
         }
     }
 

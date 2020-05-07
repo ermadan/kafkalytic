@@ -36,6 +36,7 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.util.*
+import java.util.concurrent.ExecutionException
 import java.util.regex.Pattern
 import javax.swing.*
 import javax.swing.event.DocumentEvent
@@ -205,7 +206,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                                     background (it + dialog.getValuePattern(), longTaskQueue) { progress ->
                                         search(connection, topic,
                                                 dialog.getKeyPattern(), dialog.getValuePattern(), dialog.getTimestamp(),
-                                                progress, this@MainWindow)
+                                                { progress.isCanceled }) { printMessage(it) }
                                     }
                                 }
                             }
@@ -229,10 +230,16 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                                 val dialog = GeneratorDialog(project, topic)
                                 if (dialog.showAndGet()) {
                                     background(it, longTaskQueue) { progress ->
-                                        withProducer(last.cluster.clusterProperties, dialog.getCompression(), dialog.getBatchSize()) { producer ->
-                                            produceGeneratedMessages(producer, topic,
-                                                    dialog.getTemplate(), dialog.getMessageSize(),
-                                                    dialog.getNumberOfMessages(), dialog.getDelay(), progress)
+                                        try {
+                                            withProducer(last.cluster.clusterProperties, dialog.getCompression(), dialog.getBatchSize()) { producer ->
+                                                produceGeneratedMessages(producer, topic,
+                                                        dialog.getTemplate(), dialog.getMessageSize(),
+                                                        dialog.getNumberOfMessages(), dialog.getDelay()) { progress.isCanceled }
+                                            }
+                                        } catch (e: ExecutionException) {
+                                            if (!progress.isCanceled) {
+                                                progress.cancel()
+                                            }
                                         }
                                         refreshNode(last)
                                     }
@@ -242,9 +249,15 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                                 val dialog = CopyDialog(topic, last.cluster, zRoot.children().toList() as List<KRootTreeNode>)
                                 if (dialog.showAndGet()) {
                                     background (it, longTaskQueue) { progress ->
-                                        copy(connection, topic,
-                                                dialog.getSelectedCluster().clusterProperties, dialog.getSelectedTopic().getTopicName(),
-                                                dialog.getTimestamp(), dialog.getCompression(), progress)
+                                        try {
+                                            copy(connection, topic,
+                                                    dialog.getSelectedCluster().clusterProperties, dialog.getSelectedTopic().getTopicName(),
+                                                    dialog.getTimestamp(), dialog.getCompression())  { progress.isCanceled }
+                                        } catch (e: ExecutionException) {
+                                            if (!progress.isCanceled) {
+                                                progress.cancel()
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -530,5 +543,7 @@ fun info(message: String) {
     LOG.info(message)
     foreground { Messages.showInfoMessage(message, "Kafka") }
 }
+
+
 
 

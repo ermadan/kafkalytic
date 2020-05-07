@@ -154,6 +154,7 @@ class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTr
 }
 
 val LOG = Logger.getInstance("Kafkalytic")
+
 class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMutableTreeNode(topicName), KafkaNode {
     val cluster = clusterNode
     private var offsets : Collection<Pair<Int, Long>>? = null

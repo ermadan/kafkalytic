@@ -1,11 +1,5 @@
 package org.kafkalytic.plugin
 
-import com.google.gson.GsonBuilder
-import com.google.gson.JsonSyntaxException
-import com.intellij.notification.Notification
-import com.intellij.notification.NotificationType
-import com.intellij.notification.Notifications
-import com.intellij.openapi.progress.ProgressIndicator
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -18,10 +12,6 @@ import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.kafka.common.serialization.ByteArraySerializer
-import java.lang.IllegalStateException
-import java.nio.file.Files
-import java.nio.file.Paths
-import java.nio.file.StandardOpenOption
 import java.time.Duration
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
@@ -59,18 +49,15 @@ inline fun <T> withConsumer(connection: Map<String, String>, topic: String, cons
     }
 }
 
-fun flush(futures: Collection<Future<RecordMetadata>>, progress: ProgressIndicator): Int {
+fun flush(futures: Collection<Future<RecordMetadata>>, isCancelled: () -> Boolean): Int {
     var failed = 0
     futures.forEach { f ->
         try {
             f.get()
         } catch (e: ExecutionException) {
-            if (!progress.isCanceled) {
-                progress.cancel()
-            }
+            throw(e)
             notify("publish failed:$e")
             failed++
-            LOG.info("publish failed:$e")
         }
     }
     return failed
@@ -105,20 +92,20 @@ inline fun <K, V, R> readUpTo(consumer: KafkaConsumer<K, V>, endOffsets: Map<Int
 
 
 fun copy(source: MutableMap<String, String>, sourceTopic: String, dest: MutableMap<String, String>, destTopic: String,
-         timestamp: Long, compression: String, progress: ProgressIndicator) {
+         timestamp: Long, compression: String, isCancelled: () -> Boolean) {
     notify("Copy messages from $sourceTopic to $destTopic starting...")
     withConsumer(source, sourceTopic, timestamp) {consumer, endOffsets ->
         val futures = mutableListOf<Future<RecordMetadata>>()
         withProducer(dest, compression) {producer ->
             var processed = 0
             readUpTo(consumer, endOffsets) {
-                if (progress.isCanceled) {
+                if (isCancelled()) {
                     LOG.info("Task cancelled")
                     return
                 }
                 if (processed > 0 && processed % 1000 == 0) {
                     notify("$processed records republished")
-                    val failed = flush(futures, progress)
+                    val failed = flush(futures, isCancelled)
                     if (failed > 0) {
                         notify("$failed records failed to be republish, check logs...")
                     }
@@ -127,7 +114,7 @@ fun copy(source: MutableMap<String, String>, sourceTopic: String, dest: MutableM
                 futures.add(producer.send(ProducerRecord<ByteArray, ByteArray>(destTopic, it.key(), it.value())))
                 processed++
             }
-            flush(futures, progress)
+            flush(futures, isCancelled)
             notify("Copy finished. Total $processed records republished")
         }
     }
@@ -160,25 +147,24 @@ inline fun <T> withConsumer(connection: Map<String, String>, topic: String, time
 }
 
 fun search(connection: MutableMap<String, String>, topic: String, keyPattern: String, valuePattern: String,
-           timestamp: Long, cancelableTask: ProgressIndicator, win: MainWindow) {
+           timestamp: Long, isCancelled: () -> Boolean, processor: (ConsumerRecord<ByteArray, ByteArray>) -> Unit) {
     var found = false
     notify("Searching for templates $keyPattern, $valuePattern in topic $topic")
     withConsumer(connection, topic, timestamp) { consumer, endOffsets ->
         val valueRegexp = Regex(valuePattern)
         val keyRegexp = Regex(keyPattern)
         readUpTo(consumer, endOffsets) {
-            if (cancelableTask.isCanceled) {
+            if (isCancelled()) {
                 LOG.info("Task cancelled")
                 return
             }
             LOG.info("Message:" + String(it.key()) + ":" + valueRegexp.matches(String(it.value())) + ":" + keyRegexp.matches(String(it.key())))
             if ((valuePattern.isBlank() || valueRegexp.containsMatchIn(String(it.value())))
                     && (keyPattern.isBlank() || keyRegexp.containsMatchIn(String(it.key())))) {
-                win.printMessage(it)
+                processor(it)
                 found = true
             }
         }
-//victoriatest@outliersolutions.co.uk
     }
     if (!found) {
         notify("No messages found for patterns $keyPattern $valuePattern")
@@ -206,7 +192,7 @@ inline fun withProducer(connection: Map<String, String>, compression: String, ba
 }
 
 fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topic: String, template: String,
-                             messageSize: Int, messageNumber: Int, delay: Long, progress: ProgressIndicator) {
+                             messageSize: Int, messageNumber: Int, delay: Long, isCancelled: () -> Boolean) {
     val channel = Channel<Future<RecordMetadata>>()
     GlobalScope.launch {
         // this might be heavy CPU-consuming computation or async logic, we'll just send five squares
@@ -224,7 +210,7 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
             }
 
             channel.send(producer.send(ProducerRecord<ByteArray, ByteArray>(topic, "message$current".toByteArray(), template.replace(RANDOM_PLACEHOLDER, value).toByteArray())))
-            if (progress.isCanceled) {
+            if (isCancelled()) {
                 channel.close()
                 return@launch
             }
@@ -238,10 +224,10 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
             try {
                 f.get()
                 futures++
-                LOG.info("published:" + futures)
+                LOG.info("published:$futures")
             } catch (e: ExecutionException) {
                 notify("Cannot republish ${e}")
-                progress.cancel()
+                throw (e)
                 failures++
                 LOG.info("publish failed:$e")
             }
@@ -263,11 +249,14 @@ fun produceSingleMessage(producer: KafkaProducer<ByteArray, ByteArray>, topic: S
     }
 }
 
+val logger: java.util.logging.Logger = java.util.logging.Logger.getLogger("kafkalytic")
+
+var notification: (log: String) -> Unit = {
+    logger.info(it)
+}
+
 fun notify(log: String) {
-    LOG.info(log)
-    foreground {
-        Notifications.Bus.notify(Notification("Kafkalytic", "Kafkalytic", log, NotificationType.INFORMATION))
-    }
+    notification(log)
 }
 
 val KAFKA_COMPRESSION_TYPES = arrayOf("none", "gzip", "snappy", "lz4", "zstd")
