@@ -370,6 +370,9 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                     }.map {
                         TreePath(it)
                     }.toTypedArray()
+                    if (tree.selectionModel.selectionPaths.isNotEmpty()) {
+                        tree.scrollPathToVisible(tree.selectionModel.selectionPaths[0])
+                    }
                     LOG.info("Selected topics ${tree.selectionModel.selectionPaths.size}")
                 }
             }
@@ -384,6 +387,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         return children
                 .mapNotNull { if (it.toString().toLowerCase().indexOf(text) >= 0) listOf(it) else findNodes(it, text)}
                 .flatten()
+                .filter {it is KTopicTreeNode}
     }
 
     inner class AddAction : AnAction("Add", "Add Kafka cluster node", ADD_ICON) {
