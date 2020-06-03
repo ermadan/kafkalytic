@@ -71,11 +71,14 @@ class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTr
     override fun expand() {
         if (client == null) {
             LOG.info("Creating client with $clusterProperties")
+            val contextCL = Thread.currentThread().contextClassLoader
             try {
+                Thread.currentThread().contextClassLoader = this::class.java.classLoader
                 client = AdminClient.create(clusterProperties as Map<String, Any>)
             } catch (e: KafkaException) {
                 error("Cannot connect to Kafka cluster ${clusterProperties["bootstrap.servers"]}", e)
             }
+            Thread.currentThread().contextClassLoader = contextCL
         }
         super.expand()
     }
