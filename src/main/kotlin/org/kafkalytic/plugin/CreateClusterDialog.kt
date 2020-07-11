@@ -27,7 +27,7 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         null,
         object: InputValidator {
             //host:port,
-            private val matcher = """([a-zA-Z0-9.-_]+:[0-9]{1,5},)*([a-zA-Z0-9-_]+\.)*([a-zA-Z0-9-_])+:[0-9]{1,5}""".toRegex()
+            private val matcher = """([a-zA-Z0-9\.\-_]+:[0-9]{1,5},)*([a-zA-Z0-9-_]+\.)*([a-zA-Z0-9-_])+:[0-9]{1,5}""".toRegex()
             override fun checkInput(inputString: String?) = inputString != null && matcher.matches(inputString)
             override fun canClose(inputString: String?) = checkInput(inputString)
         }) {
