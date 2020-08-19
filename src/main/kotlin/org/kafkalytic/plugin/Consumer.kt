@@ -49,7 +49,7 @@ fun consume(topic: String, props: Map<String, Any>, dialog: ConsumeDialog, progr
 
 private fun consume(consumer: KafkaConsumer<Any, Any>, howMany : Int, polls: Int, progress: ProgressIndicator, win: MainWindow) {
     var consumed = 0
-    repeat(polls) { _ ->
+    repeat(polls) {
         if (progress.isCanceled) {
             return
         }

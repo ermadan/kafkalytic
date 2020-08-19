@@ -49,32 +49,39 @@ inline fun <T> withConsumer(connection: Map<String, String>, topic: String, cons
     }
 }
 
-fun flush(futures: Collection<Future<RecordMetadata>>, isCancelled: () -> Boolean): Int {
+fun flush(futures: Collection<Future<RecordMetadata>>): Int {
     var failed = 0
     futures.forEach { f ->
         try {
             f.get()
         } catch (e: ExecutionException) {
-            throw(e)
             notify("publish failed:$e")
             failed++
+            throw(e)
         }
     }
     return failed
 }
 
 fun <K, V> seekToTimestamp(consumer: KafkaConsumer<K, V>, partitions: List<TopicPartition>, timestamp: Long) =
-        consumer.offsetsForTimes(partitions.map { it to timestamp }.toMap()).filter { it.value != null }.also {
-            it.forEach {
-                consumer.seek(it.key, it.value.offset())
-                LOG.info("Partition ${it.key} reset to ${it.value}")
-            }
+    consumer.offsetsForTimes(partitions.map { it to timestamp }.toMap()).filter { it.value != null }.also { map ->
+        map.forEach {
+            consumer.seek(it.key, it.value.offset())
+            LOG.info("Partition ${it.key} reset to ${it.value}")
         }
+    }
 
-inline fun <K, V, R> readUpTo(consumer: KafkaConsumer<K, V>, endOffsets: Map<Int, Long>, process: (ConsumerRecord<K, V>) -> R) : Collection<R> {
+inline fun <K, V, R> readUpTo(consumer: KafkaConsumer<K, V>,
+                              endOffsets: Map<Int, Long>,
+                              isCancelled: () -> Boolean,
+                              process: (ConsumerRecord<K, V>) -> R) : Collection<R> {
     val mutableOffsets = endOffsets.toMutableMap()
     val result = mutableListOf<R>()
     while (mutableOffsets.isNotEmpty()) {
+        if (isCancelled()) {
+            LOG.info("Task cancelled")
+            return result
+        }
         val records = consumer.poll(Duration.ofSeconds(3))
         val time = measureTimeMillis {
             result.addAll(records.map {
@@ -85,7 +92,7 @@ inline fun <K, V, R> readUpTo(consumer: KafkaConsumer<K, V>, endOffsets: Map<Int
                 process(it)
             })
         }
-        LOG.info("Processed :${records.count()}, time: ${time}")
+        LOG.info("Processed :${records.count()}, time: $time")
     }
     return result
 }
@@ -96,16 +103,16 @@ fun copy(source: MutableMap<String, String>, sourceTopic: String, dest: MutableM
     notify("Copy messages from $sourceTopic to $destTopic starting...")
     withConsumer(source, sourceTopic, timestamp) {consumer, endOffsets ->
         val futures = mutableListOf<Future<RecordMetadata>>()
-        withProducer(dest, compression) {producer ->
+        withProducer(dest, compression) { producer ->
             var processed = 0
-            readUpTo(consumer, endOffsets) {
+            readUpTo(consumer, endOffsets, isCancelled) {
                 if (isCancelled()) {
                     LOG.info("Task cancelled")
                     return
                 }
                 if (processed > 0 && processed % 1000 == 0) {
                     notify("$processed records republished")
-                    val failed = flush(futures, isCancelled)
+                    val failed = flush(futures)
                     if (failed > 0) {
                         notify("$failed records failed to be republish, check logs...")
                     }
@@ -114,7 +121,7 @@ fun copy(source: MutableMap<String, String>, sourceTopic: String, dest: MutableM
                 futures.add(producer.send(ProducerRecord<ByteArray, ByteArray>(destTopic, it.key(), it.value())))
                 processed++
             }
-            flush(futures, isCancelled)
+            flush(futures)
             notify("Copy finished. Total $processed records republished")
         }
     }
@@ -128,19 +135,24 @@ inline fun <T> withConsumer(connection: Map<String, String>, topic: String, time
         val partitions = consumer.listTopics()[topic]?.map { TopicPartition(topic, it.partition()) }
         if (partitions != null) {
             val endOffsets = consumer.endOffsets(partitions).map { it.key.partition() to it.value - 1 }.filter { it.second > 0 }.toMap().toMutableMap()
-            val targetOffsets = seekToTimestamp(consumer, partitions, timestamp)
-            if (targetOffsets.isEmpty()) {
-                notify("No messages found for timestamp $timestamp")
-            } else {
-                notify("Reading messages from $topic " + endOffsets.map {
-                    "partition ${it.key} from offset ${targetOffsets.entries.find { it.key.partition() == it.key.partition() }?.value} to ${it.value}"
-                }.joinToString("\n"))
-                targetOffsets.forEach {
-                    if (it.value.offset() >= endOffsets[it.key.partition()] ?: 0) {
-                        endOffsets.remove(it.key.partition())
-                    }
-                }
+            if (timestamp == 0L) {
+                consumer.seekToBeginning(partitions)
                 consume(consumer, endOffsets)
+            } else {
+                val targetOffsets = seekToTimestamp(consumer, partitions, timestamp)
+                if (targetOffsets.isEmpty()) {
+                    notify("No messages found for timestamp $timestamp")
+                } else {
+                    notify("Reading messages from $topic " + endOffsets.map {
+                        "partition ${it.key} from offset ${targetOffsets.entries.find { it.key.partition() == it.key.partition() }?.value} to ${it.value}"
+                    }.joinToString("\n"))
+                    targetOffsets.forEach {
+                        if (it.value.offset() >= endOffsets[it.key.partition()] ?: 0) {
+                            endOffsets.remove(it.key.partition())
+                        }
+                    }
+                    consume(consumer, endOffsets)//5:944754
+                }
             }
         }
     }
@@ -153,12 +165,14 @@ fun search(connection: MutableMap<String, String>, topic: String, keyPattern: St
     withConsumer(connection, topic, timestamp) { consumer, endOffsets ->
         val valueRegexp = Regex(valuePattern)
         val keyRegexp = Regex(keyPattern)
-        readUpTo(consumer, endOffsets) {
+        readUpTo(consumer, endOffsets, isCancelled) {
             if (isCancelled()) {
                 LOG.info("Task cancelled")
                 return
             }
-            LOG.info("Message:" + String(it.key()) + ":" + valueRegexp.matches(String(it.value())) + ":" + keyRegexp.matches(String(it.key())))
+            if (LOG.isDebugEnabled) {
+                LOG.debug("Message:" + String(it.key()) + ":" + valueRegexp.matches(String(it.value())) + ":" + keyRegexp.matches(String(it.key())))
+            }
             if ((valuePattern.isBlank() || valueRegexp.containsMatchIn(String(it.value())))
                     && (keyPattern.isBlank() || keyRegexp.containsMatchIn(String(it.key())))) {
                 processor(it)

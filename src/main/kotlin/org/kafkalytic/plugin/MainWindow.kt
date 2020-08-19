@@ -54,6 +54,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
     private val ADD_ICON by lazy { IconLoader.getIcon("/general/add.png")}
     private val REMOVE_ICON by lazy { IconLoader.getIcon("/general/remove.png")}
     private val REFRESH_ICON by lazy { IconLoader.getIcon("/actions/refresh.png")}
+    val KAFKA_ICON = IconLoader.getIcon("/icons/kafka.png")
     private val zRoot by lazy { DefaultMutableTreeNode("Kafka") }
     private val treeModel by lazy { DefaultTreeModel(zRoot) }
     private val tree by lazy { Tree(treeModel) }
@@ -260,6 +261,10 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                                         }
                                     }
                                 }
+                            }
+                            menu.add("Show consumption progress") {
+                                val progressDialog = ProgressDialog(topic, last.cluster.client!!, this@MainWindow, project)
+                                progressDialog.show()
                             }
                         }
                         menu.add("Refresh") {
