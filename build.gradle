@@ -10,7 +10,7 @@ buildscript {
 }
 
 plugins {
-    id 'org.jetbrains.intellij' version '0.4.2'
+    id 'org.jetbrains.intellij' version '0.4.20'
 }
 
 apply plugin: 'idea'
@@ -18,7 +18,7 @@ apply plugin: 'org.jetbrains.intellij'
 apply plugin: 'java'
 
 group 'org.ermadan'
-version '0.9.3'
+version '0.9.8'
 
 apply plugin: 'kotlin'
 
@@ -48,5 +48,5 @@ intellij {
 }
 patchPluginXml {
     changeNotes """
-        Save to file implemented, option to switch off printing to event panel"""
+        fix #11 - div by zero in message generator"""
 }

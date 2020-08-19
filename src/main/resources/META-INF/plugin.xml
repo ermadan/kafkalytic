@@ -34,7 +34,8 @@
     </extensions>
 
     <change-notes>
-        fixed bugs related to multiple ide instances running at same time
+        _ is allowed in domain name,
+        scroll visible tree frame to matching topic
     </change-notes>
     <depends>com.intellij.modules.lang</depends>
     <idea-version since-build="180.*"/>
