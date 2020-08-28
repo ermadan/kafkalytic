@@ -105,6 +105,15 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         tree.addTreeSelectionListener {
             it?.newLeadSelectionPath?.lastPathComponent?.let {node ->
                 LOG.info("selection changed:$node")
+                if (node is KRootTreeNode) {
+                    if (config.config["progress_tip"] == null) {
+                        info("""
+                            |Did you know that you can see topic consumption progress by each consumer, 
+                            |open topic context menu and choose 'Show consumption progress'
+                            """.trimMargin())
+                        config.config["progress_tip"] = "shown"
+                    }
+                }
                 propsSplit.bottomComponent = if (node is KTopicTreeNode) {
                     JBScrollPane(topicTable)
                 } else {
