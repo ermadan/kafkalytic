@@ -89,36 +89,24 @@ class OffsetsTableModel(val dialog: ProgressDialog, val topicName: String, priva
     private val LOG = Logger.getInstance("Kafkalytic")
     private var consumerRemaining : List<MutableMap<Int, Long>>? = null
     fun updateDetails() {
-        LOG.info("updating")
         val partitions = client.describeTopics(listOf(topicName)).all().get().values.first().partitions()
-        LOG.info("updating2")
 //        partitions.forEach { addColumn(it.partition()) }
-        LOG.info("updating3")
         val listOffsets = client.listOffsets(partitions.map { TopicPartition(topicName, it.partition()) to OffsetSpec.latest() }.toMap())
-        LOG.info("updating4")
         val offsets = listOffsets.all().get(5, TimeUnit.SECONDS)
-        LOG.info("updating4.1")
         val sortedBy = offsets.entries.sortedBy { it.key.partition() }
-        LOG.info("updating4.2")
         val topicOffsets = sortedBy.map { it.value.offset().toString() }
-        LOG.info("updating4.3")
 //        addRow(topicOffsets.toTypedArray())
 
-        LOG.info("updating5")
         val consumers = client.listConsumerGroups().all().get().map { consumerGroup ->
-            LOG.info("consumer0:" + consumerGroup.groupId())
             val consumerPartitions = client.listConsumerGroupOffsets(consumerGroup.groupId())
                     .partitionsToOffsetAndMetadata().get(5, TimeUnit.SECONDS).entries
                     .filter { it.key.topic() == topicName }
                     .sortedBy { it.key.partition() }
                     .map { it.value.offset().toString() }
-            LOG.info("partitions:$consumerPartitions")
             consumerPartitions
                     .toMutableList().also { it.add(0, consumerGroup.groupId()) }
         }.filter { it.size > 1 }
 //        .forEach{LOG.info("found offsets:" + it); addRow(it.toTypedArray())}
-        LOG.info("updating6")
-        LOG.info("updating8")
         dataVector.clear()
         columnIdentifiers.clear()
         addColumn("Partition")
@@ -129,7 +117,6 @@ class OffsetsTableModel(val dialog: ProgressDialog, val topicName: String, priva
         if (consumerRemaining == null || consumerRemaining!!.size < consumers.size) {
             consumerRemaining = consumers.map { mutableMapOf<Int, Long>() }
         }
-        LOG.info("updating7")
         val rows = topicOffsets.mapIndexed { index, s -> mutableListOf(partitions[index], s).also { it.addAll(consumers.mapIndexed { consumerIndex, consumerOffsets ->
             val partitionIndex = index + 1
             val currentOffset = consumerOffsets[partitionIndex]
@@ -139,12 +126,8 @@ class OffsetsTableModel(val dialog: ProgressDialog, val topicName: String, priva
             consumerRemaining!![consumerIndex][partitionIndex] = remaining
             value
         }) } }
-        LOG.info("updating7.1")
         rows.forEach {
-            LOG.info("row added")
-            LOG.info("row added: $it")
             addRow(it.toTypedArray()) }
-        LOG.info("updating8")
         fireTableStructureChanged()
     }
 }
