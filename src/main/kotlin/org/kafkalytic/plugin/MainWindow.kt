@@ -389,7 +389,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
 
         val searchTextField = SearchTextField()
         searchTextField.addDocumentListener(object : DocumentAdapter() {
-            override fun textChanged(e: DocumentEvent?) {
+            override fun textChanged(e: DocumentEvent) {
                 if (e != null) {
                     val pattern = e.document.getText(0, e.document.length).toLowerCase()
                     tree.selectionModel.selectionPaths = findNodes(zRoot, pattern).map { leaf ->
@@ -418,7 +418,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
     }
 
     inner class AddAction : AnAction("Add", "Add Kafka cluster node", ADD_ICON) {
-        override fun actionPerformed(e: AnActionEvent?) {
+        override fun actionPerformed(e: AnActionEvent) {
             val dialog = CreateClusterDialog(project)
             dialog.show()
             if (dialog.exitCode == Messages.OK) {
@@ -433,7 +433,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
     }
 
     inner class RemoveAction : AnAction("Remove","Remove Kafka cluster node", REMOVE_ICON), AnAction.TransparentUpdate {
-        override fun actionPerformed(e: AnActionEvent?) {
+        override fun actionPerformed(e: AnActionEvent) {
             removeCluster()
         }
 
@@ -443,7 +443,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
     }
 
     inner class RefreshAction : AnAction("Refresh", "Refresh Kafka cluster node", REFRESH_ICON), AnAction.TransparentUpdate {
-        override fun actionPerformed(e: AnActionEvent?) {
+        override fun actionPerformed(e: AnActionEvent) {
             val node = tree.selectionPaths[0].path[1]
             if (node is KafkaNode) {
                 refreshNode(node)

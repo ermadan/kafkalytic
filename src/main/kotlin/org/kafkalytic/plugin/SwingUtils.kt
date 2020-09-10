@@ -137,7 +137,7 @@ class PrintOptionsPanel(config: KafkaStateComponent) : JPanel(BorderLayout()) {
         file.isEnabled = printToFileSelected
         file.preferredSize = Dimension(200, 24)
         file.document.addDocumentListener(object: DocumentAdapter() {
-            override fun textChanged(e: DocumentEvent?) {
+            override fun textChanged(e: DocumentEvent) {
                 config.config["printToFile"] = file.text
                 LOG.info("path changed: " + config.config["printToFile"])
             }

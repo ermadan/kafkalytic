@@ -19,7 +19,7 @@ class CellRenderer : ColoredTreeCellRenderer() {
             node == null -> leafIcon
             node is KRootTreeNode -> folderIcon
             node is DefaultMutableTreeNode && node.parent is KRootTreeNode -> folderIcon
-            node is DefaultMutableTreeNode -> when (node?.parent?.toString()) {
+            node is DefaultMutableTreeNode -> when (node.parent?.toString()) {
                 BROKERS -> brokerIcon
                 CONSUMERS -> consumerIcon
                 else -> topicIcon

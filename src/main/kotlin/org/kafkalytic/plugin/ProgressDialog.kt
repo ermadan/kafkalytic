@@ -95,16 +95,16 @@ class OffsetsTableModel(val dialog: ProgressDialog, val topicName: String, priva
         val offsets = listOffsets.all().get(5, TimeUnit.SECONDS)
         val sortedBy = offsets.entries.sortedBy { it.key.partition() }
         val topicOffsets = sortedBy.map { it.value.offset().toString() }
-//        addRow(topicOffsets.toTypedArray())
 
-        val consumers = client.listConsumerGroups().all().get().map { consumerGroup ->
-            val consumerPartitions = client.listConsumerGroupOffsets(consumerGroup.groupId())
+        val groups = client.listConsumerGroups().all().get().map { group ->
+            group to client.listConsumerGroupOffsets(group.groupId())
                     .partitionsToOffsetAndMetadata().get(5, TimeUnit.SECONDS).entries
                     .filter { it.key.topic() == topicName }
                     .sortedBy { it.key.partition() }
-                    .map { it.value.offset().toString() }
-            consumerPartitions
-                    .toMutableList().also { it.add(0, consumerGroup.groupId()) }
+                    .map { it.value.offset() }
+        }.filter { it.second.size > 0 }
+        val consumers = groups.map { group ->
+            group.second.map { it.toString() }.toMutableList().also { it.add(0, group.first.groupId()) }
         }.filter { it.size > 1 }
 //        .forEach{LOG.info("found offsets:" + it); addRow(it.toTypedArray())}
         dataVector.clear()
@@ -115,17 +115,19 @@ class OffsetsTableModel(val dialog: ProgressDialog, val topicName: String, priva
         LOG.info("updating6" + consumers.size)
         consumers.forEach {  LOG.info("updating6" + it[0]);addColumn(it[0]) }
         if (consumerRemaining == null || consumerRemaining!!.size < consumers.size) {
-            consumerRemaining = consumers.map { mutableMapOf<Int, Long>() }
+            consumerRemaining = groups.map { it.second.mapIndexed {i, o -> i to o}.toMap().toMutableMap() }
         }
-        val rows = topicOffsets.mapIndexed { index, s -> mutableListOf(partitions[index], s).also { it.addAll(consumers.mapIndexed { consumerIndex, consumerOffsets ->
-            val partitionIndex = index + 1
-            val currentOffset = consumerOffsets[partitionIndex]
-            val remaining = s.toLong() - currentOffset.toLong()
-            val delta = (consumerRemaining!![consumerIndex][partitionIndex]?:0) - remaining
-            val value = currentOffset + " / " + remaining + " / " + (if (delta > 0) delta/dialog.updateFrequency.text.toInt() else 0)
-            consumerRemaining!![consumerIndex][partitionIndex] = remaining
-            value
-        }) } }
+        val rows = topicOffsets.mapIndexed { index, s -> mutableListOf(partitions[index], s).also {
+            it.addAll(consumers.mapIndexed { consumerIndex, consumerOffsets ->
+                val partitionIndex = index + 1
+                val currentOffset = consumerOffsets[partitionIndex]
+                val remaining = s.toLong() - currentOffset.toLong()
+                val delta = currentOffset.toLong() - (consumerRemaining!![consumerIndex][partitionIndex]?:0)
+                val value = "$currentOffset / $remaining / ${(if (delta > 0) "%.2f".format(delta.toFloat()/dialog.updateFrequency.text.toInt()) else 0)}"
+                consumerRemaining!![consumerIndex][partitionIndex] = currentOffset.toLong()
+                value
+            })
+        } }
         rows.forEach {
             addRow(it.toTypedArray()) }
         fireTableStructureChanged()
