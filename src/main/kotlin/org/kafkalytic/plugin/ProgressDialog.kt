@@ -118,7 +118,7 @@ class OffsetsTableModel(val dialog: ProgressDialog, val topicName: String, priva
             consumerRemaining = groups.map { it.second.mapIndexed {i, o -> i to o}.toMap().toMutableMap() }
         }
         val rows = topicOffsets.mapIndexed { index, s -> mutableListOf(partitions[index], s).also {
-            it.addAll(consumers.mapIndexed { consumerIndex, consumerOffsets ->
+            it.addAll(consumers.filter { index + 1 < it.size }.mapIndexed { consumerIndex, consumerOffsets ->
                 val partitionIndex = index + 1
                 val currentOffset = consumerOffsets[partitionIndex]
                 val remaining = s.toLong() - currentOffset.toLong()
