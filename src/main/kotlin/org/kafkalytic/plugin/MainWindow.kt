@@ -390,18 +390,16 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         val searchTextField = SearchTextField()
         searchTextField.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) {
-                if (e != null) {
-                    val pattern = e.document.getText(0, e.document.length).toLowerCase()
-                    tree.selectionModel.selectionPaths = findNodes(zRoot, pattern).map { leaf ->
-                        generateSequence(leaf) { it.parent }.toList().reversed().toTypedArray()
-                    }.map {
-                        TreePath(it)
-                    }.toTypedArray()
-                    if (tree.selectionModel.selectionPaths.isNotEmpty()) {
-                        tree.scrollPathToVisible(tree.selectionModel.selectionPaths[0])
-                    }
-                    LOG.info("Selected topics ${tree.selectionModel.selectionPaths.size}")
+                val pattern = e.document.getText(0, e.document.length).toLowerCase()
+                tree.selectionModel.selectionPaths = findNodes(zRoot, pattern).map { leaf ->
+                    generateSequence(leaf) { it.parent }.toList().reversed().toTypedArray()
+                }.map {
+                    TreePath(it)
+                }.toTypedArray()
+                if (tree.selectionModel.selectionPaths.isNotEmpty()) {
+                    tree.scrollPathToVisible(tree.selectionModel.selectionPaths[0])
                 }
+                LOG.info("Selected topics ${tree.selectionModel.selectionPaths.size}")
             }
         })
 

@@ -26,7 +26,7 @@ object ZkUtils {
         if (zk == null) {
             LOG.info("Establishing connection....")
             zk = ZooKeeper(source, 1000) { event: WatchedEvent ->
-                LOG.info("evnt:" + event)
+                LOG.info("event:$event")
                 if (event.state == Watcher.Event.KeeperState.SyncConnected) {
                     latch.countDown()
                 }
@@ -58,9 +58,9 @@ object ZkUtils {
     fun format(size: Int) =
             " (" + if (size > 1000) {
                 if (size > 1000_000) {
-                    (size / 1000_000 as Int).toString() + "M"
+                    (size / 1000_000).toString() + "M"
                 } else {
-                    (size / 1000 as Int).toString() + "K"
+                    (size / 1000).toString() + "K"
                 }
             } else {
                 size

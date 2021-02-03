@@ -241,9 +241,9 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
                 LOG.info("published:$futures")
             } catch (e: ExecutionException) {
                 notify("Cannot republish ${e}")
-                throw (e)
                 failures++
                 LOG.info("publish failed:$e")
+                throw (e)
             }
         }
         notify("Produced total futures ${futures}")
