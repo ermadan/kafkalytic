@@ -1,5 +1,6 @@
 package org.kafkalytic.plugin
 
+import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonSyntaxException
 import com.intellij.lang.Language
@@ -12,6 +13,8 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.progress.BackgroundTaskQueue
 import com.intellij.openapi.progress.ProgressIndicator
@@ -33,6 +36,7 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.*
 import java.nio.file.Files
+import java.nio.file.OpenOption
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.util.*
@@ -54,6 +58,8 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
     private val ADD_ICON by lazy { IconLoader.getIcon("/general/add.png")}
     private val REMOVE_ICON by lazy { IconLoader.getIcon("/general/remove.png")}
     private val REFRESH_ICON by lazy { IconLoader.getIcon("/actions/refresh.png")}
+    private val EXPORT_ICON by lazy { IconLoader.getIcon("/actions/install.png")}
+    private val IMPORT_ICON by lazy { IconLoader.getIcon("/actions/uninstall.png")}
     val KAFKA_ICON = IconLoader.getIcon("/icons/kafka.png")
     private val zRoot by lazy { DefaultMutableTreeNode("Kafka") }
     private val treeModel by lazy { DefaultTreeModel(zRoot) }
@@ -108,8 +114,8 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                 if (node is KRootTreeNode) {
                     if (config.config["progress_tip"] == null) {
                         info("""
-                            |Did you know that you can see topic consumption progress by each consumer, 
-                            |open topic context menu and choose 'Show consumption progress'
+                            |Did you know that you can now export and import clusters configuration, 
+                            |import/export buttons are on toolbar
                             """.trimMargin())
                         config.config["progress_tip"] = "shown"
                     }
@@ -382,6 +388,8 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         group.add(addButton)
         group.add(removeButton)
         group.add(refreshButton)
+        group.add(ImportAction())
+        group.add(ExportAction())
         removeButton.templatePresentation.isEnabled = false
 
         panel.add(ActionManager.getInstance().createActionToolbar("Kafka Tool", group, true).component)
@@ -390,16 +398,18 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         val searchTextField = SearchTextField()
         searchTextField.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) {
-                val pattern = e.document.getText(0, e.document.length).toLowerCase()
-                tree.selectionModel.selectionPaths = findNodes(zRoot, pattern).map { leaf ->
-                    generateSequence(leaf) { it.parent }.toList().reversed().toTypedArray()
-                }.map {
-                    TreePath(it)
-                }.toTypedArray()
-                if (tree.selectionModel.selectionPaths.isNotEmpty()) {
-                    tree.scrollPathToVisible(tree.selectionModel.selectionPaths[0])
+                if (e != null) {
+                    val pattern = e.document.getText(0, e.document.length).toLowerCase()
+                    tree.selectionModel.selectionPaths = findNodes(zRoot, pattern).map { leaf ->
+                        generateSequence(leaf) { it.parent }.toList().reversed().toTypedArray()
+                    }.map {
+                        TreePath(it)
+                    }.toTypedArray()
+                    if (tree.selectionModel.selectionPaths.isNotEmpty()) {
+                        tree.scrollPathToVisible(tree.selectionModel.selectionPaths[0])
+                    }
+                    LOG.info("Selected topics ${tree.selectionModel.selectionPaths.size}")
                 }
-                LOG.info("Selected topics ${tree.selectionModel.selectionPaths.size}")
             }
         })
 
@@ -420,17 +430,24 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
             val dialog = CreateClusterDialog(project)
             dialog.show()
             if (dialog.exitCode == Messages.OK) {
-                background("Adding Kafka cluster " + dialog.inputString) {
-                    LOG.info("added:" + dialog.getCluster())
-                    zRoot.add(KRootTreeNode(dialog.getCluster()))
-                    treeModel.reload(zRoot)
-                    config.addCluster(dialog.getCluster())
-                }
+                addCluster(dialog.getCluster())
             }
         }
     }
 
-    inner class RemoveAction : AnAction("Remove","Remove Kafka cluster node", REMOVE_ICON), AnAction.TransparentUpdate {
+    private fun addCluster(cluster: MutableMap<String, String>) {
+        background("Adding Kafka cluster ${cluster["name"]}") {
+            if (config.clusters[cluster["name"]] != null) {
+                cluster["name"] = cluster["name"] + "1"
+            }
+            LOG.info("added:$cluster")
+            zRoot.add(KRootTreeNode(cluster))
+            treeModel.reload(zRoot)
+            config.addCluster(cluster)
+        }
+    }
+
+    inner class RemoveAction : AnAction("Remove","Remove Kafka cluster node", REMOVE_ICON) {
         override fun actionPerformed(e: AnActionEvent) {
             removeCluster()
         }
@@ -440,7 +457,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         }
     }
 
-    inner class RefreshAction : AnAction("Refresh", "Refresh Kafka cluster node", REFRESH_ICON), AnAction.TransparentUpdate {
+    inner class RefreshAction : AnAction("Refresh", "Refresh Kafka cluster node", REFRESH_ICON) {
         override fun actionPerformed(e: AnActionEvent) {
             val node = tree.selectionPaths[0].path[1]
             if (node is KafkaNode) {
@@ -450,6 +467,32 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
 
         override fun update (e: AnActionEvent) {
             e.presentation.isEnabled = isRootNodeSelected()
+        }
+    }
+
+    inner class ImportAction : AnAction("Import clusters", "Import clusters from file", IMPORT_ICON), AnAction.TransparentUpdate {
+        override fun actionPerformed(e: AnActionEvent) {
+            val fcd = FileChooserDescriptor(true, false, false, false, false, false)
+            val file = FileChooser.chooseFile(fcd, project, null)
+            if (file != null) {
+                val clusters = Gson().fromJson(String(Files.readAllBytes(Paths.get(file.canonicalPath))), Map::class.java)
+                clusters.forEach {addCluster((it.value as Map<String, String>).toMutableMap())}
+            }
+        }
+    }
+
+    inner class ExportAction : AnAction("Export clusters", "Export clusters to file", EXPORT_ICON), AnAction.TransparentUpdate {
+        override fun actionPerformed(e: AnActionEvent) {
+            val fcd = FileChooserDescriptor(false, true, false, false, false, false)
+            val file = FileChooser.chooseFile(fcd, project, null)
+            if (file != null) {
+                background("Save clusters") {
+                    val clusters = GsonBuilder().setPrettyPrinting().create().toJson(config.clusters).toString();
+                    val get = Paths.get(file.canonicalPath + File.separator + "clusters.json")
+                    Files.write(get, clusters.toByteArray())
+                    file.fileSystem.refresh(true)
+                }
+            }
         }
     }
 
@@ -527,15 +570,15 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
             val (_, key) = format(record.key())
             val (lang, value) =  format(record.value())
 
-            if (config.config["printToEditorSelected"]?.toBoolean() ?: true) {
+            if (config.config["printToEditorSelected"]?.toBoolean() != false) {
                     openEditor(key, value, lang)
             }
-            if (config.config["printToFileSelected"]?.toBoolean() ?: false) {
+            if (config.config["printToFileSelected"]?.toBoolean() == true) {
                 Files.write(Paths.get(config.config["printToFile"]), value.toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
             }
             Notifications.Bus.notify(Notification("Kafkalytic", "topic:${record.topic()}",
                     "key:$key, partition:${record.partition()}, offset:${record.offset()}" +
-                            if (config.config["printToEventSelected"]?.toBoolean() ?: true) ", message:\n$value" else "",
+                            if (config.config["printToEventSelected"]?.toBoolean() != false) ", message:\n$value" else "",
                     NotificationType.INFORMATION))
         }
     }
