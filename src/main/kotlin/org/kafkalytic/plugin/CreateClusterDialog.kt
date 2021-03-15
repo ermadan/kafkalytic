@@ -9,9 +9,9 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.ui.table.JBTable
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.common.KafkaException
+import org.codehaus.groovy.runtime.StackTraceUtils
 import java.awt.*
 import java.io.FileReader
-import java.io.IOException
 import java.util.*
 import javax.swing.JButton
 import javax.swing.JLabel
@@ -25,7 +25,7 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         "New cluster",
         Messages.getQuestionIcon(),
         null,
-        object: InputValidator {
+        object : InputValidator {
             //host:port,
             private val matcher = """([a-zA-Z0-9\.\-_]+:[0-9]{1,5},)*([a-zA-Z0-9-_]+\.)*([a-zA-Z0-9-_])+:[0-9]{1,5}""".toRegex()
             override fun checkInput(inputString: String?) = inputString != null && matcher.matches(inputString)
@@ -36,11 +36,14 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
     private lateinit var name: JTextField
     private lateinit var tableModel: DefaultTableModel
     private lateinit var trustPath: JTextField
+    private lateinit var trustType: JTextField
     private lateinit var keyPath: JTextField
     private lateinit var trustPassword: JTextField
     private lateinit var keyPassword: JTextField
     private lateinit var requestTimeout: JTextField
-
+    private lateinit var saslMechanism: JTextField
+    private lateinit var saslJaasConfig: JTextField
+    private lateinit var securityProtocol: JTextField
 
     override fun createMessagePanel(): JPanel {
         val messagePanel = JPanel(BorderLayout())
@@ -52,18 +55,23 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         tableModel = DefaultTableModel()
         tableModel.addColumn("Property")
         tableModel.addColumn("Value")
-        tableModel.addTableModelListener {  }
+        tableModel.addTableModelListener { }
         myField = HintTextField("host1:port,host2:port")
         messagePanel.add(createScrollableTextComponent(), BorderLayout.CENTER)
         val browse = JButton("Load properties from file")
         val testConnection = JButton("Test connection")
         testConnection.addActionListener {
+            val contextCL = Thread.currentThread().contextClassLoader
             try {
+                // Fixing the "javax.security.auth.login.LoginException: unable to find LoginModule"
+                Thread.currentThread().contextClassLoader = this.javaClass.classLoader
+
                 AdminClient.create(getCluster() as Map<String, Any>).close()
                 info("Connection successful")
             } catch (e: KafkaException) {
-                info("Cannot connect to Kafka cluster. $e")
+                info("Cannot connect to Kafka cluster using: \n ${getCluster()}. Error\n ${StackTraceUtils.extractRootCause(e).toString()}")
             }
+            Thread.currentThread().contextClassLoader = contextCL
         }
         browse.addActionListener {
             val fcd = FileChooserDescriptor(true, false, false, false, false, false)
@@ -75,8 +83,12 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
                 props.getProperty("bootstrap.servers")?.let { myField.text = it }
                 props.getProperty("ssl.truststore.location")?.let { trustPath.text = it }
                 props.getProperty("ssl.truststore.password")?.let { trustPassword.text = it }
+                props.getProperty("ssl.truststore.type")?.let { trustType.text = it }
                 props.getProperty("ssl.keystore.location")?.let { keyPath.text = it }
                 props.getProperty("ssl.keystore.password")?.let { keyPassword.text = it }
+                props.getProperty("sasl.mechanism")?.let { saslMechanism.text = it }
+                props.getProperty("security.protocol")?.let { securityProtocol.text = it }
+                props.getProperty("sasl.jaas.config")?.let { saslJaasConfig.text = it }
             }
         }
         name = JTextField()
@@ -89,11 +101,19 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         keyPassword = JTextField()
         requestTimeout = JTextField("5000")
         requestTimeout.inputVerifier = INT_VERIFIER
+        trustType = JTextField()
+        securityProtocol = JTextField()
+        saslMechanism = JTextField()
+        saslJaasConfig = JTextField()
         certSubPanel.addLabelled("Truststore path", trustPath)
         certSubPanel.addLabelled("Truststore password", trustPassword)
+        certSubPanel.addLabelled("Request timeout, ms", requestTimeout)
         certSubPanel.addLabelled("Keystore path", keyPath)
         certSubPanel.addLabelled("Keystore password", keyPassword)
-        certSubPanel.addLabelled("Request timeout, ms", requestTimeout)
+        certSubPanel.addLabelled("Truststore type", trustType)
+        certSubPanel.addLabelled("Security protocol", securityProtocol)
+        certSubPanel.addLabelled("SASL mechanism", saslMechanism)
+        certSubPanel.addLabelled("SASL jaas config", saslJaasConfig)
         subPanel.add(certSubPanel, BorderLayout.CENTER)
         subPanel.add(layoutUD(browse, JBTable(tableModel), testConnection), BorderLayout.SOUTH)
 
@@ -105,11 +125,11 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         var props = tableModel.dataVector.elements().asSequence()
                 .map { val v = it as Vector<*>; v[0].toString() to v[1].toString() }.toMap().toMutableMap()
         if (!myField.text.trim().isNullOrEmpty()) {
-            props.put("bootstrap.servers", myField.text.trim())
+            props["bootstrap.servers"] = myField.text.trim()
         }
         props.put("name", name.text.ifBlank { props["bootstrap.servers"]!! })
         if (requestTimeout.text.isNotBlank()) {
-            props.put("request.timeout.ms", requestTimeout.text)
+            props["request.timeout.ms"] = requestTimeout.text
         }
         if (trustPath.text.isNotBlank()) {
             props.putAll(mapOf(
@@ -117,10 +137,14 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
                     "ssl.truststore.location" to trustPath.text,
                     "ssl.truststore.password" to trustPassword.text,
                     "ssl.keystore.location" to keyPath.text,
-                    "ssl.keystore.password" to keyPassword.text))
+                    "ssl.keystore.password" to keyPassword.text,
+                    "ssl.truststore.type" to trustType.text,
+                    "sasl.mechanism" to saslMechanism.text,
+                    "security.protocol" to securityProtocol.text,
+                    "sasl.jaas.config" to saslJaasConfig.text).filterValues { it != null && it.trim() != "" })
         }
 
-        LOG.info("coonection properties:$props")
+        LOG.info("connection properties:$props")
         return props
     }
 }
