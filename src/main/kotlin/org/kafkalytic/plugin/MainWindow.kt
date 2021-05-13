@@ -30,11 +30,13 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.ui.treeStructure.Tree
 import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.header.internals.RecordHeader
 import java.awt.BorderLayout
 import java.awt.event.ActionEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.*
+import java.nio.charset.Charset
 import java.nio.file.Files
 import java.nio.file.OpenOption
 import java.nio.file.Paths
@@ -236,7 +238,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                                     }
                                     background(it) {
                                         withProducer(connection, dialog.getCompression()) { producer ->
-                                            produceSingleMessage(producer, topic, dialog.getKey(), value)
+                                            produceSingleMessage(producer, topic, dialog.getKey(), value, dialog.getHeaderKey())
                                         }
                                         refreshNode(last)
                                     }

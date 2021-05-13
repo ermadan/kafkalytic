@@ -10,8 +10,11 @@ import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.header.Header
+import org.apache.kafka.common.header.internals.RecordHeader
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.kafka.common.serialization.ByteArraySerializer
+import java.nio.charset.Charset
 import java.time.Duration
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
@@ -254,14 +257,28 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
     notify("Produced total $futures messages for topic $topic")
 }
 
-fun produceSingleMessage(producer: KafkaProducer<ByteArray, ByteArray>, topic: String, key: String, value: ByteArray) {
+fun produceSingleMessage(producer: KafkaProducer<ByteArray, ByteArray>, topic: String, key: String, value: ByteArray, header : String) {
     try {
-        producer.send(ProducerRecord<ByteArray, ByteArray>(topic, key.toByteArray(), value)).get()
+        val headerKey = header?.split(";")?.getOrNull(0)
+        val headerValue = header?.split(";")?.getOrNull(1)
+        if(headerKey.isNullOrEmpty() || headerValue.isNullOrEmpty() ){
+            producer.send(ProducerRecord<ByteArray, ByteArray>(topic,key.toByteArray(), value)).get()
+
+        }else{
+            val iterable = Iterable {
+                iterator {
+                    yield(RecordHeader(headerKey, headerValue?.toByteArray(Charset.defaultCharset())));
+                }
+            }
+            producer.send(ProducerRecord<ByteArray, ByteArray>(topic,0, key.toByteArray(), value, iterable)).get()
+        }
+
         notify("Published $key")
     } catch (e: ExecutionException) {
         notify("Publish failed: $e")
     }
 }
+
 
 val logger: java.util.logging.Logger = java.util.logging.Logger.getLogger("kafkalytic")
 

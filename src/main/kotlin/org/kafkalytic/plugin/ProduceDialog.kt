@@ -8,7 +8,9 @@ import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
-import java.awt.*
+import java.awt.BorderLayout
+import java.awt.Dimension
+import java.awt.GridLayout
 import javax.swing.*
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ChangeListener
@@ -20,6 +22,7 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
     private lateinit var file: JTextField
     private lateinit var value: JTextArea
     private lateinit var key: JTextField
+    private lateinit var headerKey: JTextField
     private lateinit var compression: ComboBox<String>
     private lateinit var radios: List<JRadioButton>
     override fun stateChanged(e: ChangeEvent?) {
@@ -33,6 +36,9 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
     }
 
     override fun createCenterPanel(): JPanel {
+        headerKey= JTextField()
+        headerKey.preferredSize = Dimension(200, 24)
+
         key = JTextField()
         key.preferredSize = Dimension(200, 24)
 
@@ -51,6 +57,11 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
 
         compression = ComboBox(KAFKA_COMPRESSION_TYPES)
 
+        val main = JPanel(GridLayout(2, 1));
+
+        var headerPanel = JPanel(GridLayout(1, 1))
+        headerPanel.add(layoutLR(JBLabel("headerKey "), headerKey))
+
         val panel = JPanel(BorderLayout())
         panel.add(layoutLR(JBLabel("Key "), key), BorderLayout.NORTH)
         panel.add(JBLabel("Value"), BorderLayout.CENTER)
@@ -67,9 +78,12 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
         radios[1].isSelected = true
         stateChanged(null)
 
-        return panel
+        main.add(headerPanel);
+        main.add(panel);
+        return main
     }
 
+    fun getHeaderKey() = headerKey.text
     fun getKey() = key.text
     fun getFile() = file.text
     fun getText() = value.text
