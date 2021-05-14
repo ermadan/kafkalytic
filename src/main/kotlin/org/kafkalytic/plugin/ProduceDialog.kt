@@ -9,8 +9,11 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import java.awt.BorderLayout
+import java.awt.Color
 import java.awt.Dimension
 import java.awt.GridLayout
+import java.awt.event.FocusEvent
+import java.awt.event.FocusListener
 import javax.swing.*
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ChangeListener
@@ -29,18 +32,34 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
         file.isEnabled = radios[0].isSelected
         value.isEnabled = radios[1].isSelected
     }
-
     init {
         setTitle("Configure Kafka producer for topic $topic")
-        init()
+        init();
+        headerKey.addFocusListener(object : FocusListener {
+            override fun focusGained(e: FocusEvent) {
+                if (headerKey.getText().equals("key:value;")) {
+                    headerKey.setText("")
+                    headerKey.setForeground(Color.BLACK)
+                }
+            }
+            override fun focusLost(e: FocusEvent) {
+                if (headerKey.getText().isEmpty()) {
+                    headerKey.setForeground(Color.GRAY)
+                    headerKey.setText("key:value;")
+                }
+            }
+        })
     }
 
     override fun createCenterPanel(): JPanel {
         headerKey= JTextField()
-        headerKey.preferredSize = Dimension(200, 24)
+        headerKey.preferredSize = Dimension(150, 24)
+        headerKey = JTextField("key:value;")
+        headerKey.setForeground(Color.GRAY)
+
 
         key = JTextField()
-        key.preferredSize = Dimension(200, 24)
+        key.preferredSize = Dimension(150, 24)
 
         radios = arrayOf("Load from file ", "Text ").map { JRadioButton(it) }
 
@@ -57,13 +76,12 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
 
         compression = ComboBox(KAFKA_COMPRESSION_TYPES)
 
-        val main = JPanel(GridLayout(2, 1));
-
-        var headerPanel = JPanel(GridLayout(1, 1))
-        headerPanel.add(layoutLR(JBLabel("headerKey "), headerKey))
+        var headerPanel = JPanel(GridLayout(2, 1))
+        headerPanel.add(layoutLR(JBLabel("header: "), headerKey ))
+        headerPanel.add(layoutLR(JBLabel("key of message"), key))
 
         val panel = JPanel(BorderLayout())
-        panel.add(layoutLR(JBLabel("Key "), key), BorderLayout.NORTH)
+        panel.add(headerPanel, BorderLayout.NORTH)
         panel.add(JBLabel("Value"), BorderLayout.CENTER)
         panel.add(layoutUD(
             layoutLR(radios[1], JBScrollPane(value)),
@@ -77,10 +95,7 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
         }
         radios[1].isSelected = true
         stateChanged(null)
-
-        main.add(headerPanel);
-        main.add(panel);
-        return main
+        return panel
     }
 
     fun getHeaderKey() = headerKey.text
