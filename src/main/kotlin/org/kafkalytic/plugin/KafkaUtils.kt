@@ -208,7 +208,7 @@ inline fun withProducer(connection: Map<String, String>, compression: String, ba
 }
 
 fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topic: String, template: String,
-                             messageSize: Int, messageNumber: Int, delay: Long, isCancelled: () -> Boolean) {
+                             messageSize: Int, messageNumber: Int, delay: Long, header: String, isCancelled: () -> Boolean) {
     val channel = Channel<Future<RecordMetadata>>()
     GlobalScope.launch {
         // this might be heavy CPU-consuming computation or async logic, we'll just send five squares
@@ -225,7 +225,22 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
                 }.toString()
             }
 
-            channel.send(producer.send(ProducerRecord<ByteArray, ByteArray>(topic, "message$current".toByteArray(), template.replace(RANDOM_PLACEHOLDER, value).toByteArray())))
+            val listCustomHeader: List<String> = header?.split(";")
+
+            if (listCustomHeader.isNullOrEmpty()) {
+                channel.send(producer.send(ProducerRecord<ByteArray, ByteArray>(topic, "message$current".toByteArray(), template.replace(RANDOM_PLACEHOLDER, value).toByteArray())))
+
+            } else {
+
+                val listRecorHeader: MutableList<RecordHeader> = ArrayList<RecordHeader>();
+                listCustomHeader.forEach {
+                    val headerKey = header?.split(":")?.getOrNull(0)
+                    val headerValue = header?.split(":")?.getOrNull(1)
+                    listRecorHeader.add(RecordHeader(headerKey, (headerValue + "_" + current)?.toByteArray(Charset.defaultCharset())));
+                }
+                producer.send(ProducerRecord<ByteArray, ByteArray>(topic, 0, "message$current".toByteArray(), template.replace(RANDOM_PLACEHOLDER, value).toByteArray(), listRecorHeader.asIterable()))
+            }
+//            channel.send(producer.send(ProducerRecord<ByteArray, ByteArray>(topic, "message$current".toByteArray(), template.replace(RANDOM_PLACEHOLDER, value).toByteArray())))
             if (isCancelled()) {
                 channel.close()
                 return@launch

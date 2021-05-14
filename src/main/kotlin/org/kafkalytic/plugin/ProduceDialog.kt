@@ -6,8 +6,10 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension
@@ -21,7 +23,7 @@ import javax.swing.event.ChangeListener
 
 class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false), ChangeListener {
     private val LOG = Logger.getInstance(this::class.java)
-
+    public final var PLACE_HOLDER : String = "key:value;";
     private lateinit var file: JTextField
     private lateinit var value: JTextArea
     private lateinit var key: JTextField
@@ -37,15 +39,15 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
         init();
         headerKey.addFocusListener(object : FocusListener {
             override fun focusGained(e: FocusEvent) {
-                if (headerKey.getText().equals("key:value;")) {
+                if (headerKey.getText().equals(PLACE_HOLDER)) {
                     headerKey.setText("")
-                    headerKey.setForeground(Color.BLACK)
+                    headerKey.setForeground(UIUtil.getActiveTextColor())
                 }
             }
             override fun focusLost(e: FocusEvent) {
                 if (headerKey.getText().isEmpty()) {
-                    headerKey.setForeground(Color.GRAY)
-                    headerKey.setText("key:value;")
+                    headerKey.setForeground(UIUtil.getLabelDisabledForeground())
+                    headerKey.setText(PLACE_HOLDER)
                 }
             }
         })
@@ -54,8 +56,8 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
     override fun createCenterPanel(): JPanel {
         headerKey= JTextField()
         headerKey.preferredSize = Dimension(150, 24)
-        headerKey = JTextField("key:value;")
-        headerKey.setForeground(Color.GRAY)
+        headerKey = JTextField(PLACE_HOLDER)
+        headerKey.setForeground(UIUtil.getActiveTextColor())
 
 
         key = JTextField()

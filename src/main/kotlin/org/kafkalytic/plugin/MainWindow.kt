@@ -30,15 +30,12 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.ui.treeStructure.Tree
 import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.apache.kafka.common.header.internals.RecordHeader
 import java.awt.BorderLayout
 import java.awt.event.ActionEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.*
-import java.nio.charset.Charset
 import java.nio.file.Files
-import java.nio.file.OpenOption
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.util.*
@@ -252,7 +249,8 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                                             withProducer(last.cluster.clusterProperties, dialog.getCompression(), dialog.getBatchSize()) { producer ->
                                                 produceGeneratedMessages(producer, topic,
                                                         dialog.getTemplate(), dialog.getMessageSize(),
-                                                        dialog.getNumberOfMessages(), dialog.getDelay()) { progress.isCanceled }
+                                                        dialog.getNumberOfMessages(), dialog.getDelay(), dialog.getHeader()) { progress.isCanceled }
+
                                             }
                                         } catch (e: ExecutionException) {
                                             if (!progress.isCanceled) {
