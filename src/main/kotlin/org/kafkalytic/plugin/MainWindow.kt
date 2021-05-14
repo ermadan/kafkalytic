@@ -34,7 +34,9 @@ import java.awt.BorderLayout
 import java.awt.event.ActionEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import java.io.*
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.io.StringWriter
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
@@ -54,21 +56,21 @@ import javax.xml.transform.stream.StreamResult
 
 class MainWindow(stateComponent: KafkaStateComponent, private val project: Project) : JPanel(BorderLayout()) {
     private val LOG = Logger.getInstance("Kafkalytic")
-    private val ADD_ICON by lazy { IconLoader.getIcon("/general/add.png")}
-    private val REMOVE_ICON by lazy { IconLoader.getIcon("/general/remove.png")}
-    private val REFRESH_ICON by lazy { IconLoader.getIcon("/actions/refresh.png")}
-    private val EXPORT_ICON by lazy { IconLoader.getIcon("/actions/install.png")}
-    private val IMPORT_ICON by lazy { IconLoader.getIcon("/actions/uninstall.png")}
+    private val ADD_ICON by lazy { IconLoader.getIcon("/general/add.png") }
+    private val REMOVE_ICON by lazy { IconLoader.getIcon("/general/remove.png") }
+    private val REFRESH_ICON by lazy { IconLoader.getIcon("/actions/refresh.png") }
+    private val EXPORT_ICON by lazy { IconLoader.getIcon("/actions/install.png") }
+    private val IMPORT_ICON by lazy { IconLoader.getIcon("/actions/uninstall.png") }
     val KAFKA_ICON = IconLoader.getIcon("/icons/kafka.png")
     private val zRoot by lazy { DefaultMutableTreeNode("Kafka") }
     private val treeModel by lazy { DefaultTreeModel(zRoot) }
     private val tree by lazy { Tree(treeModel) }
-    private val tableModel by lazy {TableModel()}
-    private val topicTableModel by lazy {TopicTableModel()}
-    private val topicTable by lazy {JBTable(topicTableModel)}
-    private val addButton by lazy {AddAction()}
-    private val removeButton by lazy {RemoveAction()}
-    private val refreshButton by lazy {RefreshAction()}
+    private val tableModel by lazy { TableModel() }
+    private val topicTableModel by lazy { TopicTableModel() }
+    private val topicTable by lazy { JBTable(topicTableModel) }
+    private val addButton by lazy { AddAction() }
+    private val removeButton by lazy { RemoveAction() }
+    private val refreshButton by lazy { RefreshAction() }
     private val config = stateComponent
     private val taskQueue = BackgroundTaskQueue(project, "Kafkalytic queue")
     private val longTaskQueue = BackgroundTaskQueue(project, "Kafkalytic long task queue")
@@ -108,7 +110,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         tree.expandPath(TreePath(zRoot))
 
         tree.addTreeSelectionListener {
-            it?.newLeadSelectionPath?.lastPathComponent?.let {node ->
+            it?.newLeadSelectionPath?.lastPathComponent?.let { node ->
                 LOG.info("selection changed:$node")
                 if (node is KRootTreeNode) {
                     if (config.config["progress_tip"] == null) {
@@ -145,9 +147,9 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                         return
                     }
 
-                    val menu = object: JPopupMenu() {
+                    val menu = object : JPopupMenu() {
                         fun add(name: String, task: (title: String) -> Unit) {
-                            add(JMenuItem(object: AbstractAction(name) {
+                            add(JMenuItem(object : AbstractAction(name) {
                                 override fun actionPerformed(e: ActionEvent) {
                                     task(name)
                                 }
@@ -167,8 +169,8 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                             info(tree.selectionModel.selectionPaths.size.toString() + " topics were selected.")
                         }
                     }
-                    val topicNodes = paths.filter {it.lastPathComponent is KTopicTreeNode}.map{it.lastPathComponent as KTopicTreeNode}
-                    val topics = topicNodes.map {it.getTopicName()}
+                    val topicNodes = paths.filter { it.lastPathComponent is KTopicTreeNode }.map { it.lastPathComponent as KTopicTreeNode }
+                    val topics = topicNodes.map { it.getTopicName() }
                     if (topics.isNotEmpty()) {
                         menu.add("Delete topic(s)") {
                             if (Messages.OK == Messages.showOkCancelDialog(
@@ -210,15 +212,15 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                             menu.add("Consume ") {
                                 val dialog = ConsumeDialog(topic, config)
                                 if (dialog.showAndGet()) {
-                                    background (it, longTaskQueue) { progress ->
-                                        consume(topic, connection, dialog,  progress, this@MainWindow)
+                                    background(it, longTaskQueue) { progress ->
+                                        consume(topic, connection, dialog, progress, this@MainWindow)
                                     }
                                 }
                             }
                             menu.add("Search topic for the message ") {
                                 val dialog = SearchDialog(topic, config)
                                 if (dialog.showAndGet()) {
-                                    background (it + dialog.getValuePattern(), longTaskQueue) { progress ->
+                                    background(it + dialog.getValuePattern(), longTaskQueue) { progress ->
                                         search(connection, topic,
                                                 dialog.getKeyPattern(), dialog.getValuePattern(), dialog.getTimestamp(),
                                                 { progress.isCanceled }) { printMessage(it) }
@@ -264,11 +266,11 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                             menu.add("Copy topic messages to another") {
                                 val dialog = CopyDialog(topic, last.cluster, zRoot.children().toList() as List<KRootTreeNode>)
                                 if (dialog.showAndGet()) {
-                                    background (it, longTaskQueue) { progress ->
+                                    background(it, longTaskQueue) { progress ->
                                         try {
                                             copy(connection, topic,
                                                     dialog.getSelectedCluster().clusterProperties, dialog.getSelectedTopic().getTopicName(),
-                                                    dialog.getTimestamp(), dialog.getCompression())  { progress.isCanceled }
+                                                    dialog.getTimestamp(), dialog.getCompression()) { progress.isCanceled }
                                         } catch (e: ExecutionException) {
                                             if (!progress.isCanceled) {
                                                 progress.cancel()
@@ -299,7 +301,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                                             future?.get()
                                             info("topic ${dialog.getTopic()} was created.")
                                             refreshNode(clusterNode.getTopics())
-                                        } catch (e : Exception) {
+                                        } catch (e: Exception) {
                                             info("$future\ntopic ${dialog.getTopic()} was not created")
                                         }
                                     }
@@ -338,10 +340,10 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                     config.clusters.remove(clusterName)
                     config.clusters[value] = clusterConfig
                 }
-                with (clusterConfig) {
+                with(clusterConfig) {
                     if (key.startsWith("Broker ")) {
                         val bootstrap = tableModel.dataVector.elements().asSequence()
-                                .mapNotNull { val v = it as Vector<*>; if (v[0].toString().startsWith("Broker ")) v[1].toString() else null }.joinToString (",")
+                                .mapNotNull { val v = it as Vector<*>; if (v[0].toString().startsWith("Broker ")) v[1].toString() else null }.joinToString(",")
                         this.put("bootstrap.servers", bootstrap)
                         (tableModel.currentNode as KRootTreeNode).refresh()
                     } else {
@@ -417,12 +419,12 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         return panel
     }
 
-    private fun findNodes(parent: TreeNode, text: String) : Collection<TreeNode> {
+    private fun findNodes(parent: TreeNode, text: String): Collection<TreeNode> {
         val children = (parent.children() as Enumeration<TreeNode>).toList()
         return children
-                .mapNotNull { if (it.toString().toLowerCase().indexOf(text) >= 0) listOf(it) else findNodes(it, text)}
+                .mapNotNull { if (it.toString().toLowerCase().indexOf(text) >= 0) listOf(it) else findNodes(it, text) }
                 .flatten()
-                .filter {it is KTopicTreeNode}
+                .filter { it is KTopicTreeNode }
     }
 
     inner class AddAction : AnAction("Add", "Add Kafka cluster node", ADD_ICON) {
@@ -441,18 +443,22 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                 cluster["name"] = cluster["name"] + "1"
             }
             LOG.info("added:$cluster")
+            // fix ssl handshake
+            if(cluster["ssl.endpoint.identification.algorithm"] == null){
+                cluster["ssl.endpoint.identification.algorithm"]="";
+            }
             zRoot.add(KRootTreeNode(cluster))
             treeModel.reload(zRoot)
             config.addCluster(cluster)
         }
     }
 
-    inner class RemoveAction : AnAction("Remove","Remove Kafka cluster node", REMOVE_ICON) {
+    inner class RemoveAction : AnAction("Remove", "Remove Kafka cluster node", REMOVE_ICON) {
         override fun actionPerformed(e: AnActionEvent) {
             removeCluster()
         }
 
-        override fun update (e: AnActionEvent) {
+        override fun update(e: AnActionEvent) {
             e.presentation.isEnabled = isRootNodeSelected()
         }
     }
@@ -465,7 +471,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
             }
         }
 
-        override fun update (e: AnActionEvent) {
+        override fun update(e: AnActionEvent) {
             e.presentation.isEnabled = isRootNodeSelected()
         }
     }
@@ -476,7 +482,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
             val file = FileChooser.chooseFile(fcd, project, null)
             if (file != null) {
                 val clusters = Gson().fromJson(String(Files.readAllBytes(Paths.get(file.canonicalPath))), Map::class.java)
-                clusters.forEach {addCluster((it.value as Map<String, String>).toMutableMap())}
+                clusters.forEach { addCluster((it.value as Map<String, String>).toMutableMap()) }
             }
         }
     }
@@ -534,44 +540,44 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         FileEditorManager.getInstance(project).openFile(psiFileFromText.virtualFile, true)
     }
 
-    private fun <T> format(s: T) : Pair<String, String> {
+    private fun <T> format(s: T): Pair<String, String> {
         val value = when (s) {
             is String -> s
             is ByteArray -> String(s)
             else -> s.toString()
         }.trim()
         return if (value.startsWith("{")) {
-                try {
-                    val gson = GsonBuilder().setPrettyPrinting().create()
-                    "JSON" to gson.toJson(gson.fromJson(value, Map::class.java))
-                } catch (e: JsonSyntaxException) {
-                    "TEXT" to value
-                }
-            } else if (value.startsWith("<")) {
-                try {
-                    val dbf = DocumentBuilderFactory.newInstance()
-                    val db = dbf.newDocumentBuilder()
+            try {
+                val gson = GsonBuilder().setPrettyPrinting().create()
+                "JSON" to gson.toJson(gson.fromJson(value, Map::class.java))
+            } catch (e: JsonSyntaxException) {
+                "TEXT" to value
+            }
+        } else if (value.startsWith("<")) {
+            try {
+                val dbf = DocumentBuilderFactory.newInstance()
+                val db = dbf.newDocumentBuilder()
 
-                    val transformer = TransformerFactory.newInstance().newTransformer()
-                    transformer.setOutputProperty(OutputKeys.INDENT, "yes")
-                    transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2")
-                    val result = StreamResult(StringWriter())
-                    val source = DOMSource(db.parse(ByteArrayInputStream(value.toByteArray())))
-                    transformer.transform(source, result)
-                    "XML" to result.getWriter().toString()
-                } catch (e: Exception) {
-                    "TEXT" to value
-                }
-            } else "TEXT" to value
+                val transformer = TransformerFactory.newInstance().newTransformer()
+                transformer.setOutputProperty(OutputKeys.INDENT, "yes")
+                transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2")
+                val result = StreamResult(StringWriter())
+                val source = DOMSource(db.parse(ByteArrayInputStream(value.toByteArray())))
+                transformer.transform(source, result)
+                "XML" to result.getWriter().toString()
+            } catch (e: Exception) {
+                "TEXT" to value
+            }
+        } else "TEXT" to value
     }
 
     fun <K, V> printMessage(record: ConsumerRecord<K, V>) {
         foreground {
             val (_, key) = format(record.key())
-            val (lang, value) =  format(record.value())
+            val (lang, value) = format(record.value())
 
             if (config.config["printToEditorSelected"]?.toBoolean() != false) {
-                    openEditor(key, value, lang)
+                openEditor(key, value, lang)
             }
             if (config.config["printToFileSelected"]?.toBoolean() == true) {
                 Files.write(Paths.get(config.config["printToFile"]), value.toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)

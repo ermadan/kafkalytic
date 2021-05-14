@@ -1,14 +1,13 @@
 package org.kafkalytic.plugin
 
-import java.util.*
 import javax.swing.table.DefaultTableModel
-import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.TreeNode
 
-class TopicTableModel: DefaultTableModel() {
+class TopicTableModel : DefaultTableModel() {
     init {
         listOf("Property", "Value").forEach { addColumn(it) }
     }
+
     fun updateDetails(node: TreeNode?) {
         dataVector.clear()
         if (node != null) {
@@ -17,6 +16,7 @@ class TopicTableModel: DefaultTableModel() {
             }
         }
     }
+
     override fun isCellEditable(row: Int, column: Int) = false
 }
 
@@ -51,7 +51,7 @@ class TableModel : DefaultTableModel() {
 
     override fun isCellEditable(row: Int, column: Int) = currentNode is KRootTreeNode && column == 1
 
-    fun addEditListener( listener: (key: String, value: String) -> Unit) {
+    fun addEditListener(listener: (key: String, value: String) -> Unit) {
         this.listener = listener
     }
 }

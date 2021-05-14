@@ -1,18 +1,16 @@
 package org.kafkalytic.plugin
 
-import com.intellij.openapi.diagnostic.Logger
 import org.apache.zookeeper.KeeperException
 import org.apache.zookeeper.WatchedEvent
 import org.apache.zookeeper.Watcher
 import org.apache.zookeeper.ZooKeeper
 import java.io.IOException
 import java.io.PrintWriter
-import java.util.HashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 object ZkUtils {
-//    private val LOG = Logger.getInstance("zoolytic")
+    //    private val LOG = Logger.getInstance("zoolytic")
     private val zookeepers = HashMap<String, ZooKeeper>()
 
     @Throws(IOException::class, InterruptedException::class)
@@ -43,13 +41,13 @@ object ZkUtils {
     }
 
     fun getData(source: String, path: String) =
-        try {
-            getZk(source)?.getData(path, false, null)
-        } catch (e: KeeperException) {
-            LOG.info("KeeperException $e, retry")
-            disconnect(source)
-            getZk(source)?.getData(path, false, null)
-        }
+            try {
+                getZk(source)?.getData(path, false, null)
+            } catch (e: KeeperException) {
+                LOG.info("KeeperException $e, retry")
+                disconnect(source)
+                getZk(source)?.getData(path, false, null)
+            }
 
     fun disconnect(source: String) {
         getZk(source).close()
@@ -66,11 +64,11 @@ object ZkUtils {
                 size
             } + ")"
 
-    fun count(zk: ZooKeeper, path: String, file: PrintWriter) : Int {
+    fun count(zk: ZooKeeper, path: String, file: PrintWriter): Int {
         try {
             val data = zk.getData(path, false, zk.exists(path, false));
             file.println(path + format((data?.size ?: 0)))
-            val kids = zk.getChildren(path, false).fold(0) {a, c -> a + count(zk, path + (if (path.endsWith("/")) "" else "/") + c, file)}
+            val kids = zk.getChildren(path, false).fold(0) { a, c -> a + count(zk, path + (if (path.endsWith("/")) "" else "/") + c, file) }
             val total = (data?.size ?: 0) + kids;
             if (kids > 0) {
                 file.println(path + " total:" + format(total))

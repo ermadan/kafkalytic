@@ -13,7 +13,7 @@ import java.text.SimpleDateFormat
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 
-fun layoutLR(left: JComponent, center: JComponent? = null, right: JComponent? = null) : JPanel {
+fun layoutLR(left: JComponent, center: JComponent? = null, right: JComponent? = null): JPanel {
     val panel = JPanel(BorderLayout())
     panel.add(left, BorderLayout.WEST)
     center?.let { panel.add(it, BorderLayout.CENTER) }
@@ -21,7 +21,7 @@ fun layoutLR(left: JComponent, center: JComponent? = null, right: JComponent? = 
     return panel
 }
 
-fun layoutUD(top: JComponent, center: JComponent? = null, bottom: JComponent? = null) : JPanel {
+fun layoutUD(top: JComponent, center: JComponent? = null, bottom: JComponent? = null): JPanel {
     val panel = JPanel(BorderLayout())
     panel.add(top, BorderLayout.NORTH)
     center?.let { panel.add(it, BorderLayout.CENTER) }
@@ -41,7 +41,7 @@ fun JPanel.addLabelled(label: String, field: Component) {
 }
 
 val INT_VERIFIER = object : InputVerifier() {
-    override fun verify(input: JComponent) : Boolean {
+    override fun verify(input: JComponent): Boolean {
         try {
             with(Integer.parseInt((input as JTextField).text)) {
                 return this <= Int.MAX_VALUE && this >= 0
@@ -52,7 +52,7 @@ val INT_VERIFIER = object : InputVerifier() {
     }
 }
 val INT_NON_ZERO_VERIFIER = object : InputVerifier() {
-    override fun verify(input: JComponent) : Boolean {
+    override fun verify(input: JComponent): Boolean {
         try {
             with(Integer.parseInt((input as JTextField).text)) {
                 return this <= Int.MAX_VALUE && this > 0
@@ -62,27 +62,27 @@ val INT_NON_ZERO_VERIFIER = object : InputVerifier() {
         }
     }
 }
-val LONG_VALIDATOR = object: InputValidator {
+val LONG_VALIDATOR = object : InputValidator {
     override fun checkInput(inputString: String?) = true
     override fun canClose(inputString: String?) =
-        try {
-            with(java.lang.Long.parseLong(inputString)) {
-                this <= Long.MAX_VALUE && this >= 0
+            try {
+                with(java.lang.Long.parseLong(inputString)) {
+                    this <= Long.MAX_VALUE && this >= 0
+                }
+            } catch (e: NumberFormatException) {
+                false
             }
-        } catch (e: NumberFormatException) {
-            false
-        }
 
 }
 val DATE_FORMAT = SimpleDateFormat("dd/MM/yy hh:mm:ss")
 val DATE_VERIFIER = object : InputVerifier() {
     override fun verify(input: JComponent) =
-        try {
-            DATE_FORMAT.parse((input as JTextField).text)
-            true
-        } catch (e: ParseException) {
-            false
-        }
+            try {
+                DATE_FORMAT.parse((input as JTextField).text)
+                true
+            } catch (e: ParseException) {
+                false
+            }
 }
 
 val TOPIC_VERIFIER = object : InputVerifier() {
@@ -115,10 +115,14 @@ class PrintOptionsPanel(config: KafkaStateComponent) : JPanel(BorderLayout()) {
     val printToEvent: JCheckBox
     val printToFile: JCheckBox
     val printToEditor: JCheckBox
-    val file = JTextField(config.config["printToFile"] ?: Paths.get(System.getProperty("user.dir"), "kafkalytic-messages.txt").toString())
+    val file = JTextField(config.config["printToFile"]
+            ?: Paths.get(System.getProperty("user.dir"), "kafkalytic-messages.txt").toString())
+
     init {
-        printToEditor = JCheckBox("Print message payload to Editor window", null, config.config["printToEditorSelected"]?.toBoolean() ?: true)
-        printToEvent = JCheckBox("Print message payload to EventLog window", null, config.config["printToEventSelected"]?.toBoolean() ?: true)
+        printToEditor = JCheckBox("Print message payload to Editor window", null, config.config["printToEditorSelected"]?.toBoolean()
+                ?: true)
+        printToEvent = JCheckBox("Print message payload to EventLog window", null, config.config["printToEventSelected"]?.toBoolean()
+                ?: true)
         val printToFileSelected = config.config["printToFileSelected"]?.toBoolean() ?: false
         printToFile = JCheckBox("Print message payload to file", null, printToFileSelected)
         printToEditor.addActionListener {
@@ -136,14 +140,14 @@ class PrintOptionsPanel(config: KafkaStateComponent) : JPanel(BorderLayout()) {
         }
         file.isEnabled = printToFileSelected
         file.preferredSize = Dimension(200, 24)
-        file.document.addDocumentListener(object: DocumentAdapter() {
+        file.document.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) {
                 config.config["printToFile"] = file.text
                 LOG.info("path changed: " + config.config["printToFile"])
             }
         })
         val browse = JButton("Browse")
-        browse.addActionListener{
+        browse.addActionListener {
             val fcd = FileChooserDescriptor(true, true, false, false, false, false)
             val fileName = FileChooser.chooseFile(fcd, null, null)?.canonicalPath
             file.text = if (Files.isDirectory(Paths.get(fileName))) Paths.get(fileName, "kafkaMessages.txt").toString() else fileName
