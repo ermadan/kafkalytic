@@ -8,7 +8,9 @@ import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
-import java.awt.*
+import java.awt.BorderLayout
+import java.awt.Dimension
+import java.awt.GridLayout
 import javax.swing.*
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ChangeListener
@@ -16,10 +18,11 @@ import javax.swing.event.ChangeListener
 
 class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false), ChangeListener {
     private val LOG = Logger.getInstance(this::class.java)
-
+    public final var PLACE_HOLDER: String = "key:value;";
     private lateinit var file: JTextField
     private lateinit var value: JTextArea
     private lateinit var key: JTextField
+    private lateinit var headerKey: JTextField
     private lateinit var compression: ComboBox<String>
     private lateinit var radios: List<JRadioButton>
     override fun stateChanged(e: ChangeEvent?) {
@@ -29,12 +32,17 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
 
     init {
         setTitle("Configure Kafka producer for topic $topic")
-        init()
+        init();
     }
 
     override fun createCenterPanel(): JPanel {
+        headerKey = HintTextField(PLACE_HOLDER)
+        headerKey.preferredSize = Dimension(250, 24)
+
+
+
         key = JTextField()
-        key.preferredSize = Dimension(200, 24)
+        key.preferredSize = Dimension(250, 24)
 
         radios = arrayOf("Load from file ", "Text ").map { JRadioButton(it) }
 
@@ -44,20 +52,24 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
         file = JTextField()
         file.preferredSize = Dimension(200, 24)
         val browse = JButton("Browse")
-        browse.addActionListener{
+        browse.addActionListener {
             val fcd = FileChooserDescriptor(true, false, false, false, false, false)
             file.text = FileChooser.chooseFile(fcd, project, null)?.canonicalPath
         }
 
         compression = ComboBox(KAFKA_COMPRESSION_TYPES)
 
+        var headerPanel = JPanel(GridLayout(0, 2))
+        headerPanel.add(layoutLR(JBLabel("header: "), headerKey))
+        headerPanel.add(layoutLR(JBLabel("key of message"), key))
+
         val panel = JPanel(BorderLayout())
-        panel.add(layoutLR(JBLabel("Key "), key), BorderLayout.NORTH)
+        panel.add(headerPanel, BorderLayout.NORTH)
         panel.add(JBLabel("Value"), BorderLayout.CENTER)
         panel.add(layoutUD(
-            layoutLR(radios[1], JBScrollPane(value)),
-            layoutLR(radios[0], layoutLR(file, browse)),
-            layoutLR(JBLabel("Compression"), compression)), BorderLayout.SOUTH)
+                layoutLR(radios[1], JBScrollPane(value)),
+                layoutLR(radios[0], layoutLR(file, browse)),
+                layoutLR(JBLabel("Compression"), compression)), BorderLayout.SOUTH)
 
         val radioGroup = ButtonGroup()
         radios.forEach {
@@ -66,10 +78,10 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
         }
         radios[1].isSelected = true
         stateChanged(null)
-
         return panel
     }
 
+    fun getHeaderKey() = headerKey.text
     fun getKey() = key.text
     fun getFile() = file.text
     fun getText() = value.text

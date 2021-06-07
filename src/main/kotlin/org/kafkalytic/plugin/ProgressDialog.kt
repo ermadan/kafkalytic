@@ -87,7 +87,7 @@ class ProgressDialog(val topic: String, client: AdminClient, private val mainWin
 
 class OffsetsTableModel(val dialog: ProgressDialog, val topicName: String, private val client: AdminClient) : DefaultTableModel() {
     private val LOG = Logger.getInstance("Kafkalytic")
-    private var consumerRemaining : List<MutableMap<Int, Long>>? = null
+    private var consumerRemaining: List<MutableMap<Int, Long>>? = null
     fun updateDetails() {
         val partitions = client.describeTopics(listOf(topicName)).all().get().values.first().partitions()
 //        partitions.forEach { addColumn(it.partition()) }
@@ -113,23 +113,26 @@ class OffsetsTableModel(val dialog: ProgressDialog, val topicName: String, priva
         addColumn("Topic latest offsets")
 
         LOG.info("updating6" + consumers.size)
-        consumers.forEach {  LOG.info("updating6" + it[0]);addColumn(it[0]) }
+        consumers.forEach { LOG.info("updating6" + it[0]);addColumn(it[0]) }
         if (consumerRemaining == null || consumerRemaining!!.size < consumers.size) {
-            consumerRemaining = groups.map { it.second.mapIndexed {i, o -> i to o}.toMap().toMutableMap() }
+            consumerRemaining = groups.map { it.second.mapIndexed { i, o -> i to o }.toMap().toMutableMap() }
         }
-        val rows = topicOffsets.mapIndexed { index, s -> mutableListOf(partitions[index], s).also {
-            it.addAll(consumers.filter { index + 1 < it.size }.mapIndexed { consumerIndex, consumerOffsets ->
-                val partitionIndex = index + 1
-                val currentOffset = consumerOffsets[partitionIndex]
-                val remaining = s.toLong() - currentOffset.toLong()
-                val delta = currentOffset.toLong() - (consumerRemaining!![consumerIndex][partitionIndex]?:0)
-                val value = "$currentOffset / $remaining / ${(if (delta > 0) "%.2f".format(delta.toFloat()/dialog.updateFrequency.text.toInt()) else 0)}"
-                consumerRemaining!![consumerIndex][partitionIndex] = currentOffset.toLong()
-                value
-            })
-        } }
+        val rows = topicOffsets.mapIndexed { index, s ->
+            mutableListOf(partitions[index], s).also {
+                it.addAll(consumers.filter { index + 1 < it.size }.mapIndexed { consumerIndex, consumerOffsets ->
+                    val partitionIndex = index + 1
+                    val currentOffset = consumerOffsets[partitionIndex]
+                    val remaining = s.toLong() - currentOffset.toLong()
+                    val delta = currentOffset.toLong() - (consumerRemaining!![consumerIndex][partitionIndex] ?: 0)
+                    val value = "$currentOffset / $remaining / ${(if (delta > 0) "%.2f".format(delta.toFloat() / dialog.updateFrequency.text.toInt()) else 0)}"
+                    consumerRemaining!![consumerIndex][partitionIndex] = currentOffset.toLong()
+                    value
+                })
+            }
+        }
         rows.forEach {
-            addRow(it.toTypedArray()) }
+            addRow(it.toTypedArray())
+        }
         fireTableStructureChanged()
     }
 }

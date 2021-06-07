@@ -34,8 +34,7 @@
     </extensions>
 
     <change-notes>
-        _ is allowed in domain name,
-        scroll visible tree frame to matching topic
+        - update option to add custom header
     </change-notes>
     <depends>com.intellij.modules.lang</depends>
     <idea-version since-build="180.*"/>

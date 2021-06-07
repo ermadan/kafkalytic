@@ -10,22 +10,27 @@ import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.header.Header
+import org.apache.kafka.common.header.Headers
+import org.apache.kafka.common.header.internals.RecordHeader
+import org.apache.kafka.common.header.internals.RecordHeaders
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.kafka.common.serialization.ByteArraySerializer
+import java.nio.charset.Charset
 import java.time.Duration
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
 import kotlin.math.roundToInt
 import kotlin.system.measureTimeMillis
 
-fun loadOffsets(connection: MutableMap<String, String>, topic: String) : Collection<Pair<Int, Long>>? {
-    return withConsumer(connection, topic) {consumer ->
+fun loadOffsets(connection: MutableMap<String, String>, topic: String): Collection<Pair<Int, Long>>? {
+    return withConsumer(connection, topic) { consumer ->
         consumer.endOffsets(consumer.listTopics()[topic]?.map { TopicPartition(it.topic(), it.partition()) })
-                .map {it.key.partition() to it.value}
+                .map { it.key.partition() to it.value }
     }
 }
 
-inline fun <T> withConsumer(connection: Map<String, String>, topic: String, consume : (KafkaConsumer<ByteArray, ByteArray>) -> T): T? {
+inline fun <T> withConsumer(connection: Map<String, String>, topic: String, consume: (KafkaConsumer<ByteArray, ByteArray>) -> T): T? {
     val props = mutableMapOf<String, Any>()
     props.putAll(connection)
 
@@ -64,17 +69,17 @@ fun flush(futures: Collection<Future<RecordMetadata>>): Int {
 }
 
 fun <K, V> seekToTimestamp(consumer: KafkaConsumer<K, V>, partitions: List<TopicPartition>, timestamp: Long) =
-    consumer.offsetsForTimes(partitions.map { it to timestamp }.toMap()).filter { it.value != null }.also { map ->
-        map.forEach {
-            consumer.seek(it.key, it.value.offset())
-            LOG.info("Partition ${it.key} reset to ${it.value}")
+        consumer.offsetsForTimes(partitions.map { it to timestamp }.toMap()).filter { it.value != null }.also { map ->
+            map.forEach {
+                consumer.seek(it.key, it.value.offset())
+                LOG.info("Partition ${it.key} reset to ${it.value}")
+            }
         }
-    }
 
 inline fun <K, V, R> readUpTo(consumer: KafkaConsumer<K, V>,
                               endOffsets: Map<Int, Long>,
                               isCancelled: () -> Boolean,
-                              process: (ConsumerRecord<K, V>) -> R) : Collection<R> {
+                              process: (ConsumerRecord<K, V>) -> R): Collection<R> {
     val mutableOffsets = endOffsets.toMutableMap()
     val result = mutableListOf<R>()
     while (mutableOffsets.isNotEmpty()) {
@@ -101,7 +106,7 @@ inline fun <K, V, R> readUpTo(consumer: KafkaConsumer<K, V>,
 fun copy(source: MutableMap<String, String>, sourceTopic: String, dest: MutableMap<String, String>, destTopic: String,
          timestamp: Long, compression: String, isCancelled: () -> Boolean) {
     notify("Copy messages from $sourceTopic to $destTopic starting...")
-    withConsumer(source, sourceTopic, timestamp) {consumer, endOffsets ->
+    withConsumer(source, sourceTopic, timestamp) { consumer, endOffsets ->
         val futures = mutableListOf<Future<RecordMetadata>>()
         withProducer(dest, compression) { producer ->
             var processed = 0
@@ -128,7 +133,7 @@ fun copy(source: MutableMap<String, String>, sourceTopic: String, dest: MutableM
 }
 
 inline fun <T> withConsumer(connection: Map<String, String>, topic: String, timestamp: Long,
-                            consume : (KafkaConsumer<ByteArray, ByteArray>, Map<Int, Long>) -> T) {
+                            consume: (KafkaConsumer<ByteArray, ByteArray>, Map<Int, Long>) -> T) {
     withConsumer(connection, topic) { consumer ->
         consumer.poll(Duration.ofSeconds(100))
         LOG.info("consumer assignements:" + consumer.assignment())
@@ -206,7 +211,7 @@ inline fun withProducer(connection: Map<String, String>, compression: String, ba
 }
 
 fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topic: String, template: String,
-                             messageSize: Int, messageNumber: Int, delay: Long, isCancelled: () -> Boolean) {
+                             messageSize: Int, messageNumber: Int, delay: Long, header: String, isCancelled: () -> Boolean) {
     val channel = Channel<Future<RecordMetadata>>()
     GlobalScope.launch {
         // this might be heavy CPU-consuming computation or async logic, we'll just send five squares
@@ -223,7 +228,11 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
                 }.toString()
             }
 
-            channel.send(producer.send(ProducerRecord<ByteArray, ByteArray>(topic, "message$current".toByteArray(), template.replace(RANDOM_PLACEHOLDER, value).toByteArray())))
+            val message = ProducerRecord(topic, null,
+                "message$current".toByteArray(), template.replace(RANDOM_PLACEHOLDER, value).toByteArray(),
+                header?.let { createCustomHeader(it) }
+            )
+            channel.send(producer.send(message));
             if (isCancelled()) {
                 channel.close()
                 return@launch
@@ -254,14 +263,25 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
     notify("Produced total $futures messages for topic $topic")
 }
 
-fun produceSingleMessage(producer: KafkaProducer<ByteArray, ByteArray>, topic: String, key: String, value: ByteArray) {
+fun produceSingleMessage(producer: KafkaProducer<ByteArray, ByteArray>, topic: String, key: String, value: ByteArray, header: String) {
     try {
-        producer.send(ProducerRecord<ByteArray, ByteArray>(topic, key.toByteArray(), value)).get()
+        val message = ProducerRecord(topic, null, key.toByteArray(), value, header?.let { createCustomHeader(it) })
+        producer.send(message).get()
         notify("Published $key")
     } catch (e: ExecutionException) {
         notify("Publish failed: $e")
     }
 }
+
+fun createCustomHeader(header: String, current: Int = -1 ): Iterable<RecordHeader>
+{
+    var headerSuffix: String = if (current != -1) "_$current" else "";
+    return header.split(";").map {
+        val (key, value) = it.split(":")
+        RecordHeader(key, (value + headerSuffix).toByteArray(Charset.defaultCharset()))
+    }
+}
+
 
 val logger: java.util.logging.Logger = java.util.logging.Logger.getLogger("kafkalytic")
 

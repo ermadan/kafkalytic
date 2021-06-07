@@ -31,23 +31,23 @@ fun consume(topic: String, props: Map<String, Any>, dialog: ConsumeDialog, progr
             val assignments = consumer.assignment()
             val endOffsets = consumer.endOffsets(assignments)
             LOG.info("Iterating partitions with offsets $endOffsets")
-            endOffsets.forEach{ (partition, offset) ->
+            endOffsets.forEach { (partition, offset) ->
                 consumer.seek(partition, if (dialog.getDecrement() > offset) 0 else offset - dialog.getDecrement())
             }
-            consume(consumer, dialog.getDecrement() * endOffsets.size, 5,progress, win)
+            consume(consumer, dialog.getDecrement() * endOffsets.size, 5, progress, win)
         }
         2 -> {
             val partitions = consumer.partitionsFor(topic)
             consumer.assign(partitions.filter { it.partition() == dialog.getPartition() }
-                    .map { TopicPartition(topic, it.partition())})
+                    .map { TopicPartition(topic, it.partition()) })
             consumer.seek(TopicPartition(topic, dialog.getPartition()), dialog.getOffset())
-            consume(consumer, 1, 5,  progress, win)
+            consume(consumer, 1, 5, progress, win)
         }
     }
     consumer.unsubscribe()
 }
 
-private fun consume(consumer: KafkaConsumer<Any, Any>, howMany : Int, polls: Int, progress: ProgressIndicator, win: MainWindow) {
+private fun consume(consumer: KafkaConsumer<Any, Any>, howMany: Int, polls: Int, progress: ProgressIndicator, win: MainWindow) {
     var consumed = 0
     repeat(polls) {
         if (progress.isCanceled) {
@@ -56,7 +56,7 @@ private fun consume(consumer: KafkaConsumer<Any, Any>, howMany : Int, polls: Int
         val records = consumer.poll(Duration.ofSeconds(3)) as ConsumerRecords<Any, Any>
         // Handle new records
         LOG.info("polling:" + records.count())
-        records.forEach {record ->
+        records.forEach { record ->
             win.printMessage(record)
             consumed++
             if (consumed == howMany) {

@@ -2,7 +2,8 @@ package org.kafkalytic.plugin
 
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
-import java.awt.*
+import java.awt.Dimension
+import java.awt.GridLayout
 import java.util.*
 import javax.swing.*
 import javax.swing.event.ChangeEvent
@@ -38,7 +39,7 @@ class SearchDialog(topic: String, val config: KafkaStateComponent) : DialogWrapp
 
         return layoutUD(timestampPanel,
                 layoutUD(layoutLR(JLabel("Value search pattern"), valuePattern),
-                layoutLR(JLabel("Key search pattern"), keyPattern)),
+                        layoutLR(JLabel("Key search pattern"), keyPattern)),
                 printOptionsPanel)
     }
 

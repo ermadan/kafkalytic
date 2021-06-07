@@ -47,7 +47,7 @@ abstract class KafkaTreeNode(userObject: Any) : DefaultMutableTreeNode(userObjec
 
     override fun expand() {
         LOG.info("Expand $this")
-        if (childCount > 0 && getChildAt(0) == loadingNode ) {
+        if (childCount > 0 && getChildAt(0) == loadingNode) {
             getKafkaRoot().client?.let {
                 try {
                     readChildren(it).let {
@@ -62,7 +62,7 @@ abstract class KafkaTreeNode(userObject: Any) : DefaultMutableTreeNode(userObjec
         LOG.info("Expand complete $this")
     }
 
-    abstract fun readChildren(client: AdminClient) : List<DefaultMutableTreeNode>
+    abstract fun readChildren(client: AdminClient): List<DefaultMutableTreeNode>
 }
 
 class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTreeNode(clusterProperties) {
@@ -95,12 +95,13 @@ class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTr
     override fun headers() = listOf("Property", "Value")
 
     override fun rows() =
-            (clusterProperties).filter { (k, _) -> k != "bootstrap.servers"}.map { (k, v) -> arrayOf(k, v)}
-                .toMutableList().also {
-                    it.addAll(clusterProperties["bootstrap.servers"]
-                        .toString()
-                        .split(",")
-                        .mapIndexed { index, broker -> arrayOf("Broker $index", broker) }) }
+            (clusterProperties).filter { (k, _) -> k != "bootstrap.servers" }.map { (k, v) -> arrayOf(k, v) }
+                    .toMutableList().also {
+                        it.addAll(clusterProperties["bootstrap.servers"]
+                                .toString()
+                                .split(",")
+                                .mapIndexed { index, broker -> arrayOf("Broker $index", broker) })
+                    }
 
     override fun refresh() {
         if (client != null) {
@@ -111,42 +112,45 @@ class KRootTreeNode(val clusterProperties: MutableMap<String, String>) : KafkaTr
     }
 
     override fun readChildren(client: AdminClient) = listOf(
-        object : KafkaTreeNode(BROKERS) {
-            override fun readChildren(client: AdminClient) =
-                client.describeCluster().nodes().get().map {
-                    object : DefaultMutableTreeNode(it.idString() + " (" + it.host() + ":" + it.port() + ")"), KafkaTableNode {
-                        override fun headers() = listOf("Property", "Value")
-                        override fun rows() = client?.describeConfigs(listOf(ConfigResource(ConfigResource.Type.BROKER,it.idString())))
-                                ?.all()?.get()?.values?.first()?.entries()?.sortedBy { it.name() }
-                                ?.map {configEntry ->  arrayOf(configEntry.name().toString(), configEntry.value()?:"")}
-                                ?:emptyList()
-                    }
-                }
-        },
-        object : KafkaTreeNode(CONSUMERS) {
-            override fun readChildren(client: AdminClient) =
-                client.listConsumerGroups().all().get().map { it.groupId() }.map {
-                    object : DefaultMutableTreeNode(it), KafkaTableNode {
-                        override fun rows(): List<Array<String>> =
-                            client.listConsumerGroupOffsets(getUserObject() as String)
-                                .partitionsToOffsetAndMetadata().get().entries
-                                .map { (k, v) ->
-                                    arrayOf(k.toString(), v.offset().toString(), v.metadata())
+            object : KafkaTreeNode(BROKERS) {
+                override fun readChildren(client: AdminClient) =
+                        client.describeCluster().nodes().get().map {
+                            object : DefaultMutableTreeNode(it.idString() + " (" + it.host() + ":" + it.port() + ")"), KafkaTableNode {
+                                override fun headers() = listOf("Property", "Value")
+                                override fun rows() = client?.describeConfigs(listOf(ConfigResource(ConfigResource.Type.BROKER, it.idString())))
+                                        ?.all()?.get()?.values?.first()?.entries()?.sortedBy { it.name() }
+                                        ?.map { configEntry ->
+                                            arrayOf(configEntry.name().toString(), configEntry.value() ?: "")
+                                        }
+                                        ?: emptyList()
+                            }
+                        }
+            },
+            object : KafkaTreeNode(CONSUMERS) {
+                override fun readChildren(client: AdminClient) =
+                        client.listConsumerGroups().all().get().map { it.groupId() }.map {
+                            object : DefaultMutableTreeNode(it), KafkaTableNode {
+                                override fun rows(): List<Array<String>> =
+                                        client.listConsumerGroupOffsets(getUserObject() as String)
+                                                .partitionsToOffsetAndMetadata().get().entries
+                                                .map { (k, v) ->
+                                                    arrayOf(k.toString(), v.offset().toString(), v.metadata())
+                                                }
+
+                                override fun headers() = listOf("Partition", "Offset", "Metadata")
+                            }
+                        }
+            },
+            object : KafkaTreeNode(TOPICS) {
+                override fun readChildren(client: AdminClient) =
+                        client.listTopics(ListTopicsOptions().listInternal(true)).listings().get().map { it.name() }.sorted()
+                                .map {
+                                    KTopicTreeNode(it, this@KRootTreeNode)
                                 }
-                        override fun headers() = listOf("Partition", "Offset", "Metadata")
-                    }
-                }
-        },
-        object : KafkaTreeNode(TOPICS) {
-            override fun readChildren(client: AdminClient) =
-                client.listTopics(ListTopicsOptions().listInternal(true)).listings().get().map { it.name() }.sorted()
-                    .map {
-                        KTopicTreeNode(it, this@KRootTreeNode)
-                    }
-        }
+            }
     )
 
-    fun getTopics() = children.map {it as KafkaTreeNode}.find {it.userObject == TOPICS}!!
+    fun getTopics() = children.map { it as KafkaTreeNode }.find { it.userObject == TOPICS }!!
 
     fun delete(names: Collection<String>) {
         client?.let { it.deleteTopics(names).all().get() }
@@ -160,7 +164,7 @@ val LOG = Logger.getInstance("Kafkalytic")
 
 class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMutableTreeNode(topicName), KafkaNode {
     val cluster = clusterNode
-    private var offsets : Collection<Pair<Int, Long>>? = null
+    private var offsets: Collection<Pair<Int, Long>>? = null
 
     fun getTopicName() = userObject as String
     fun getPartitions() = cluster.client.let {
@@ -184,12 +188,12 @@ class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMut
     fun setPartitions(partitions: Int) {
         cluster.client?.createPartitions(mapOf(getTopicName() to NewPartitions.increaseTo(partitions)))
                 ?.values()?.entries?.forEach {
-            try {
-                notify("Partition for topic ${it.key} created")
-            } catch (e: Exception) {
-                notify("Partition for topic ${it.key} not created: $e")
-            }
-        }
+                    try {
+                        notify("Partition for topic ${it.key} created")
+                    } catch (e: Exception) {
+                        notify("Partition for topic ${it.key} not created: $e")
+                    }
+                }
         LOG.info("Partitions for topic ${getTopicName()} changed to $partitions")
     }
 
@@ -205,7 +209,7 @@ class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMut
         }
     }
 
-    override fun headers() =  listOf("Partition Id", "ISR", "Leader", "Offset")
+    override fun headers() = listOf("Partition Id", "ISR", "Leader", "Offset")
 
     override fun rows() = getPartitions().map { partition ->
         arrayOf(
@@ -221,6 +225,8 @@ class KTopicTreeNode(topicName: String, clusterNode: KRootTreeNode) : DefaultMut
     }
 
     fun zooPropValues() = cluster.client?.describeConfigs(listOf(ConfigResource(ConfigResource.Type.TOPIC,
-            getTopicName())))?.all()?.get()?.values?.first()?.entries()?.sortedBy { it.name() }?.map {arrayOf(it.name().toString(), it.value()?:"")}
+            getTopicName())))?.all()?.get()?.values?.first()?.entries()?.sortedBy { it.name() }?.map {
+        arrayOf(it.name().toString(), it.value() ?: "")
+    }
 }
 
