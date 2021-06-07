@@ -228,14 +228,10 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
                 }.toString()
             }
 
-            val message = ProducerRecord<ByteArray, ByteArray>(topic, "message$current".toByteArray(), template.replace(RANDOM_PLACEHOLDER, value).toByteArray())
-            if(!header.isNullOrEmpty()){
-                //Custom WITHOUT HEADER
-                val header = createCustomHeader(header, current);
-                header.forEach {
-                    message.headers().add(it);
-                }
-            }
+            val message = ProducerRecord(topic, null,
+                "message$current".toByteArray(), template.replace(RANDOM_PLACEHOLDER, value).toByteArray(),
+                header?.let { createCustomHeader(it) }
+            )
             channel.send(producer.send(message));
             if (isCancelled()) {
                 channel.close()
@@ -269,14 +265,7 @@ fun produceGeneratedMessages(producer: KafkaProducer<ByteArray, ByteArray>, topi
 
 fun produceSingleMessage(producer: KafkaProducer<ByteArray, ByteArray>, topic: String, key: String, value: ByteArray, header: String) {
     try {
-        val message = ProducerRecord<ByteArray, ByteArray>(topic, key.toByteArray(), value)
-        if(!header.isNullOrEmpty()){
-            //Custom WITHOUT HEADER
-            val header = createCustomHeader(header);
-            header.forEach {
-                message.headers().add(it);
-            }
-        }
+        val message = ProducerRecord(topic, null, key.toByteArray(), value, header?.let { createCustomHeader(it) })
         producer.send(message).get()
         notify("Published $key")
     } catch (e: ExecutionException) {
@@ -284,16 +273,13 @@ fun produceSingleMessage(producer: KafkaProducer<ByteArray, ByteArray>, topic: S
     }
 }
 
-fun createCustomHeader(header: String, current: Int = -1 ): Headers {
-    var headerSuffix: String = if (current != -1) ("_$current") else "";
-    val Headers = RecordHeaders();
-    val listCustomHeader: List<String> = header?.split(";")
-    listCustomHeader.forEach {
-        val headerKey = header?.split(":")?.getOrNull(0)
-        val headerValue = header?.split(":")?.getOrNull(1)
-        Headers.add(RecordHeader(headerKey, (headerValue + headerSuffix).toByteArray(Charset.defaultCharset())))
+fun createCustomHeader(header: String, current: Int = -1 ): Iterable<RecordHeader>
+{
+    var headerSuffix: String = if (current != -1) "_$current" else "";
+    return header.split(";").map {
+        val (key, value) = it.split(":")
+        RecordHeader(key, (value + headerSuffix).toByteArray(Charset.defaultCharset()))
     }
-    return Headers;
 }
 
 
