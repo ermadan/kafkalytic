@@ -10,10 +10,7 @@ import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.header.Header
-import org.apache.kafka.common.header.Headers
 import org.apache.kafka.common.header.internals.RecordHeader
-import org.apache.kafka.common.header.internals.RecordHeaders
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import java.nio.charset.Charset
@@ -273,13 +270,16 @@ fun produceSingleMessage(producer: KafkaProducer<ByteArray, ByteArray>, topic: S
     }
 }
 
-fun createCustomHeader(header: String, current: Int = -1 ): Iterable<RecordHeader>
-{
+fun createCustomHeader(header: String, current: Int = -1): Iterable<RecordHeader>? {
+    if (header.isNullOrEmpty())
+        return null;
     var headerSuffix: String = if (current != -1) "_$current" else "";
-    return header.split(";").map {
-        val (key, value) = it.split(":")
-        RecordHeader(key, (value + headerSuffix).toByteArray(Charset.defaultCharset()))
-    }
+    return ("$header;").split(";")
+        .filter { it -> !it.isNullOrEmpty() }
+        .map {
+            val (key, value) = it?.split(":")
+            RecordHeader(key, (value + headerSuffix).toByteArray(Charset.defaultCharset()))
+        }
 }
 
 
