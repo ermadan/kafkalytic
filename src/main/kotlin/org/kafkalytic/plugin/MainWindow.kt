@@ -30,6 +30,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.ui.treeStructure.Tree
 import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.header.Headers
 import java.awt.BorderLayout
 import java.awt.event.ActionEvent
 import java.awt.event.MouseAdapter
@@ -575,18 +576,22 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         foreground {
             val (_, key) = format(record.key())
             val (lang, value) = format(record.value())
-
+            val header = extractCustomHeader(record.headers())
             if (config.config["printToEditorSelected"]?.toBoolean() != false) {
-                openEditor(key, value, lang)
+                openEditor(key, "${ if (header.isNullOrEmpty()) "" else "header: ${header}"} ${value}", lang)
             }
             if (config.config["printToFileSelected"]?.toBoolean() == true) {
-                Files.write(Paths.get(config.config["printToFile"]), value.toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
+                Files.write(Paths.get(config.config["printToFile"]), "${ if (header.isNullOrEmpty()) "" else  "header: ${header}"} \n ${value}".toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
             }
             Notifications.Bus.notify(Notification("Kafkalytic", "topic:${record.topic()}",
-                    "key:$key, partition:${record.partition()}, offset:${record.offset()}" +
+                "${ if (header.isNullOrEmpty()) "" else  "header: ${header} \n"} key: $key, partition:${record.partition()}, offset:${record.offset()}" +
                             if (config.config["printToEventSelected"]?.toBoolean() != false) ", message:\n$value" else "",
                     NotificationType.INFORMATION))
         }
+    }
+
+    fun extractCustomHeader(headers: Headers): String {
+        return  headers.toArray().mapIndexed { index, it -> "[ key ${index + 1}:  ${it.key()}, value ${index + 1}: ${String(it.value())} ] "}.joinToString(" | ");
     }
 
 }

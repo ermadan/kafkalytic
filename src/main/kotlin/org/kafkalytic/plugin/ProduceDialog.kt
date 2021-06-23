@@ -22,7 +22,7 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
     private lateinit var file: JTextField
     private lateinit var value: JTextArea
     private lateinit var key: JTextField
-    private lateinit var headerKey: JTextField
+    private lateinit var headerKey: HintTextField
     private lateinit var compression: ComboBox<String>
     private lateinit var radios: List<JRadioButton>
     override fun stateChanged(e: ChangeEvent?) {
