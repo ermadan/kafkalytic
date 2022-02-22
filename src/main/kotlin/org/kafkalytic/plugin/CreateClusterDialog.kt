@@ -10,7 +10,8 @@ import com.intellij.ui.table.JBTable
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.common.KafkaException
 import org.codehaus.groovy.runtime.StackTraceUtils
-import java.awt.*
+import java.awt.BorderLayout
+import java.awt.GridLayout
 import java.io.FileReader
 import java.util.*
 import javax.swing.JButton
@@ -143,8 +144,9 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
                     "security.protocol" to securityProtocol.text,
                     "sasl.jaas.config" to saslJaasConfig.text).filterValues { it != null && it.trim() != "" })
         }
-
         LOG.info("connection properties:$props")
+        //fix ssl handshake
+        props.put("ssl.endpoint.identification.algorithm", "");
         return props
     }
 }

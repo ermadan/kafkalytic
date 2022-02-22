@@ -18,7 +18,7 @@ apply plugin: 'org.jetbrains.intellij'
 apply plugin: 'java'
 
 group 'org.ermadan'
-version '0.9.8'
+version '0.9.9'
 
 apply plugin: 'kotlin'
 

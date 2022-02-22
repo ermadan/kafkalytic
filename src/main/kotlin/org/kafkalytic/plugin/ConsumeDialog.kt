@@ -1,18 +1,13 @@
 package org.kafkalytic.plugin
 
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.fileChooser.FileChooser
-import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
 import org.apache.kafka.common.serialization.*
-import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension
 import java.awt.GridLayout
-import java.nio.file.Paths
 import javax.swing.*
-import javax.swing.border.Border
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ChangeListener
 
@@ -20,7 +15,7 @@ import javax.swing.event.ChangeListener
 class ConsumeDialog(topic: String, val config: KafkaStateComponent) : DialogWrapper(false), ChangeListener {
     private val LOG = Logger.getInstance(this::class.java)
 
-    private lateinit var waitFor : JTextField
+    private lateinit var waitFor: JTextField
     private lateinit var polls: JTextField
     private lateinit var decrement: JTextField
     private lateinit var partition: JTextField
@@ -96,8 +91,8 @@ class ConsumeDialog(topic: String, val config: KafkaStateComponent) : DialogWrap
         return layoutUD(deserizalizerSubPanel, methodSubPanel, printOptionsPanel)
     }
 
-    fun getKeyDeserializer()= "org.apache.kafka.common.serialization." + keyDeserializer.selectedItem
-    fun getValueDeserializer()= "org.apache.kafka.common.serialization." + valueDeserializer.selectedItem
+    fun getKeyDeserializer() = "org.apache.kafka.common.serialization." + keyDeserializer.selectedItem
+    fun getValueDeserializer() = "org.apache.kafka.common.serialization." + valueDeserializer.selectedItem
     fun getDecrement() = if (radios[1].isSelected) decrement.text.toInt() else 0
     fun getPartition() = if (radios[2].isSelected) partition.text.toInt() else 0
     fun getOffset() = if (radios[2].isSelected) offset.text.toLong() else 0

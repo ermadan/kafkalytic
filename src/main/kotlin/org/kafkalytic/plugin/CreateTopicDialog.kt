@@ -9,7 +9,9 @@ import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.GridLayout
 import java.util.*
-import javax.swing.*
+import javax.swing.JButton
+import javax.swing.JPanel
+import javax.swing.JTextField
 import javax.swing.table.DefaultTableModel
 
 class CreateTopicDialog() : Messages.InputDialog(
@@ -17,7 +19,7 @@ class CreateTopicDialog() : Messages.InputDialog(
         "New topic",
         Messages.getQuestionIcon(),
         null,
-        object: InputValidator {
+        object : InputValidator {
             override fun checkInput(inputString: String?) = true
             override fun canClose(inputString: String?) = inputString != null && inputString.isNotEmpty()
         }) {
@@ -92,15 +94,16 @@ class CreateTopicDialog() : Messages.InputDialog(
         private var tableModel: DefaultTableModel
         private var options: ComboBox<String>
         private var value: JTextField
+
         init {
             options = ComboBox(optionNames)
             value = JTextField("")
-            tableModel = object: DefaultTableModel() {
+            tableModel = object : DefaultTableModel() {
                 override fun isCellEditable(row: Int, column: Int) = column == 1
             }
             tableModel.addColumn("Property")
             tableModel.addColumn("Value")
-            tableModel.addTableModelListener {  }
+            tableModel.addTableModelListener { }
 
 
             val addButton = JButton("Add Property")
@@ -119,8 +122,8 @@ class CreateTopicDialog() : Messages.InputDialog(
         }
 
         fun getConfig() =
-            tableModel.dataVector.elements().asSequence()
-                    .map { val v = it as Vector<*>; v[0].toString() to v[1].toString() }.toMap()
+                tableModel.dataVector.elements().asSequence()
+                        .map { val v = it as Vector<*>; v[0].toString() to v[1].toString() }.toMap()
 
     }
 
