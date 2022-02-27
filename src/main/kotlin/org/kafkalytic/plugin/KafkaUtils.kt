@@ -275,10 +275,10 @@ fun createCustomHeader(header: String, current: Int = -1): Iterable<RecordHeader
         return null;
     var headerSuffix: String = if (current != -1) "_$current" else "";
     return ("$header;").split(";")
-        .filter { it -> !it.isNullOrEmpty() }
+        .filter { !it.isNullOrEmpty() }
         .map {
-            val (key, value) = it?.split(":")
-            RecordHeader(key, (value + headerSuffix).toByteArray(Charset.defaultCharset()))
+            val index = it.indexOf(":")
+            RecordHeader(it.substring(0, index), (it.substring(index + 1) + headerSuffix).toByteArray(Charset.defaultCharset()))
         }
 }
 

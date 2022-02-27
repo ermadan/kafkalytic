@@ -18,7 +18,6 @@ import javax.swing.event.ChangeListener
 
 class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false), ChangeListener {
     private val LOG = Logger.getInstance(this::class.java)
-    public final var PLACE_HOLDER: String = "key:value;";
     private lateinit var file: JTextField
     private lateinit var value: JTextArea
     private lateinit var key: JTextField
@@ -36,7 +35,7 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
     }
 
     override fun createCenterPanel(): JPanel {
-        headerKey = HintTextField(PLACE_HOLDER)
+        headerKey = HintTextField("key:value;")
         headerKey.preferredSize = Dimension(250, 24)
 
 
