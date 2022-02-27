@@ -57,12 +57,11 @@ import javax.xml.transform.stream.StreamResult
 
 class MainWindow(stateComponent: KafkaStateComponent, private val project: Project) : JPanel(BorderLayout()) {
     private val LOG = Logger.getInstance("Kafkalytic")
-    private val ADD_ICON by lazy { IconLoader.getIcon("/general/add.png") }
-    private val REMOVE_ICON by lazy { IconLoader.getIcon("/general/remove.png") }
-    private val REFRESH_ICON by lazy { IconLoader.getIcon("/actions/refresh.png") }
-    private val EXPORT_ICON by lazy { IconLoader.getIcon("/actions/install.png") }
-    private val IMPORT_ICON by lazy { IconLoader.getIcon("/actions/uninstall.png") }
-    val KAFKA_ICON = IconLoader.getIcon("/icons/kafka.png")
+    private val ADD_ICON by lazy { IconLoader.getIcon("/general/add.png", MainWindow::class.java) }
+    private val REMOVE_ICON by lazy { IconLoader.getIcon("/general/remove.png", MainWindow::class.java) }
+    private val REFRESH_ICON by lazy { IconLoader.getIcon("/actions/refresh.png", MainWindow::class.java) }
+    private val EXPORT_ICON by lazy { IconLoader.getIcon("/actions/install.png", MainWindow::class.java) }
+    private val IMPORT_ICON by lazy { IconLoader.getIcon("/actions/uninstall.png", MainWindow::class.java) }
     private val zRoot by lazy { DefaultMutableTreeNode("Kafka") }
     private val treeModel by lazy { DefaultTreeModel(zRoot) }
     private val tree by lazy { Tree(treeModel) }
@@ -144,7 +143,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
             override fun mousePressed(e: MouseEvent) {
                 if (SwingUtilities.isRightMouseButton(e)) {
                     val paths = tree.selectionPaths
-                    if (paths.isEmpty()) {
+                    if (paths.isNullOrEmpty()) {
                         return
                     }
 
@@ -159,7 +158,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                     }
                     menu.add("Select topics") {
                         val pattern = Messages.showInputDialog("Enter selection regexp",
-                                "Select topics", Messages.getQuestionIcon())
+                                "Select Topics", Messages.getQuestionIcon())
                         if (!pattern.isNullOrEmpty()) {
                             val parent = (paths.first().path[1] as KRootTreeNode).getTopics()
                             tree.selectionModel.selectionPaths = parent.children().asSequence()
@@ -176,7 +175,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
                         menu.add("Delete topic(s)") {
                             if (Messages.OK == Messages.showOkCancelDialog(
                                             "You are about to delete following topics " + topics.joinToString("\n"),
-                                            "Kafka", Messages.getQuestionIcon())) {
+                                            "Kafka", Messages.getOkButton(), Messages.getCancelButton(), Messages.getQuestionIcon())) {
                                 background("Deleting kafka topics") {
                                     val cluster = topicNodes.first().cluster
                                     cluster.delete(topics)
@@ -374,7 +373,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         val clusterNode = tree.selectionPaths[0].lastPathComponent as KRootTreeNode
         if (Messages.OK == Messages.showOkCancelDialog(
                         "You are about to delete Kafka cluster $clusterNode",
-                        "Kafka", Messages.getQuestionIcon())) {
+                        "Kafka", Messages.getOkButton(), Messages.getCancelButton(), Messages.getQuestionIcon())) {
             zRoot.remove(clusterNode)
             treeModel.reload(zRoot)
             tableModel.updateDetails(null)
@@ -401,18 +400,17 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         val searchTextField = SearchTextField()
         searchTextField.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) {
-                if (e != null) {
-                    val pattern = e.document.getText(0, e.document.length).toLowerCase()
-                    tree.selectionModel.selectionPaths = findNodes(zRoot, pattern).map { leaf ->
-                        generateSequence(leaf) { it.parent }.toList().reversed().toTypedArray()
-                    }.map {
-                        TreePath(it)
-                    }.toTypedArray()
-                    if (tree.selectionModel.selectionPaths.isNotEmpty()) {
-                        tree.scrollPathToVisible(tree.selectionModel.selectionPaths[0])
-                    }
-                    LOG.info("Selected topics ${tree.selectionModel.selectionPaths.size}")
+                val pattern = e.document.getText(0, e.document.length).toLowerCase()
+                val nodes = findNodes(zRoot, pattern).map { leaf ->
+                    generateSequence(leaf) { it.parent }.toList().reversed().toTypedArray()
+                }.map {
+                    TreePath(it)
+                }.toTypedArray()
+                tree.selectionModel.selectionPaths = nodes
+                if (tree.selectionModel.selectionPaths.isNotEmpty()) {
+                    tree.scrollPathToVisible(tree.selectionModel.selectionPaths[0])
                 }
+                LOG.info("Selected topics ${tree.selectionModel.selectionPaths.size}")
             }
         })
 
@@ -446,7 +444,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
             LOG.info("added:$cluster")
             // fix ssl handshake
             if(cluster["ssl.endpoint.identification.algorithm"] == null){
-                cluster["ssl.endpoint.identification.algorithm"]="";
+                cluster["ssl.endpoint.identification.algorithm"]=""
             }
             zRoot.add(KRootTreeNode(cluster))
             treeModel.reload(zRoot)
@@ -477,7 +475,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         }
     }
 
-    inner class ImportAction : AnAction("Import clusters", "Import clusters from file", IMPORT_ICON), AnAction.TransparentUpdate {
+    inner class ImportAction : AnAction("Import Clusters", "Import clusters from file", IMPORT_ICON) {
         override fun actionPerformed(e: AnActionEvent) {
             val fcd = FileChooserDescriptor(true, false, false, false, false, false)
             val file = FileChooser.chooseFile(fcd, project, null)
@@ -488,13 +486,13 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         }
     }
 
-    inner class ExportAction : AnAction("Export clusters", "Export clusters to file", EXPORT_ICON), AnAction.TransparentUpdate {
+    inner class ExportAction : AnAction("Export Clusters", "Export clusters to file", EXPORT_ICON) {
         override fun actionPerformed(e: AnActionEvent) {
             val fcd = FileChooserDescriptor(false, true, false, false, false, false)
             val file = FileChooser.chooseFile(fcd, project, null)
             if (file != null) {
                 background("Save clusters") {
-                    val clusters = GsonBuilder().setPrettyPrinting().create().toJson(config.clusters).toString();
+                    val clusters = GsonBuilder().setPrettyPrinting().create().toJson(config.clusters).toString()
                     val get = Paths.get(file.canonicalPath + File.separator + "clusters.json")
                     Files.write(get, clusters.toByteArray())
                     file.fileSystem.refresh(true)
@@ -509,7 +507,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         }
         return tree.selectionPaths.fold(true) { a, v ->
             val path = v.lastPathComponent
-            a && (path is KRootTreeNode) && (path.isLeaf || path is KRootTreeNode)
+            a && (path is KRootTreeNode) && (path.isLeaf)
         }
     }
 
@@ -578,20 +576,20 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
             val (lang, value) = format(record.value())
             val header = extractCustomHeader(record.headers())
             if (config.config["printToEditorSelected"]?.toBoolean() != false) {
-                openEditor(key, "${ if (header.isNullOrEmpty()) "" else "header: ${header}"} ${value}", lang)
+                openEditor(key, "${ if (header.isEmpty()) "" else "header: ${header}"} ${value}", lang)
             }
             if (config.config["printToFileSelected"]?.toBoolean() == true) {
-                Files.write(Paths.get(config.config["printToFile"]), "${ if (header.isNullOrEmpty()) "" else  "header: ${header}"} \n ${value}".toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
+                Files.write(Paths.get(config.config["printToFile"]), "${ if (header.isEmpty()) "" else  "header: ${header}"} \n ${value}".toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
             }
             Notifications.Bus.notify(Notification("Kafkalytic", "topic:${record.topic()}",
-                "${ if (header.isNullOrEmpty()) "" else  "header: ${header} \n"} key: $key, partition:${record.partition()}, offset:${record.offset()}" +
+                "${ if (header.isEmpty()) "" else  "header: ${header} \n"} key: $key, partition:${record.partition()}, offset:${record.offset()}" +
                             if (config.config["printToEventSelected"]?.toBoolean() != false) ", message:\n$value" else "",
                     NotificationType.INFORMATION))
         }
     }
 
     fun extractCustomHeader(headers: Headers): String {
-        return  headers.toArray().mapIndexed { index, it -> "[ key ${index + 1}:  ${it.key()}, value ${index + 1}: ${String(it.value())} ] "}.joinToString(" | ");
+        return  headers.toArray().mapIndexed { index, it -> "[ key ${index + 1}:  ${it.key()}, value ${index + 1}: ${String(it.value())} ] "}.joinToString(" | ")
     }
 
 }
