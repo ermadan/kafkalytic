@@ -30,11 +30,11 @@
     <extensions defaultExtensionNs="com.intellij">
         <applicationService serviceImplementation="org.kafkalytic.plugin.KafkaStateComponent"/>
 
-        <toolWindow id="kafkalytic" anchor="right" factoryClass="org.kafkalytic.plugin.KafkalyticToolWindowFactory"/>
+        <toolWindow id="Kafkalytic" anchor="right" factoryClass="org.kafkalytic.plugin.KafkalyticToolWindowFactory" icon="/icons/kafka2.svg"/>
+        <notificationGroup id="Kafkalytic" displayType="BALLOON" key="notification.group.name"/>
     </extensions>
-
     <change-notes>
-        - update option to add custom header
+        - removed zookeeper dependency with vulnerable log4j
     </change-notes>
     <depends>com.intellij.modules.lang</depends>
     <idea-version since-build="180.*"/>

@@ -1,6 +1,5 @@
 package org.kafkalytic.plugin
 
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.project.Project
@@ -10,15 +9,12 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import java.awt.BorderLayout
 import java.awt.Dimension
-import java.awt.GridLayout
 import javax.swing.*
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ChangeListener
 
 
 class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false), ChangeListener {
-    private val LOG = Logger.getInstance(this::class.java)
-    public final var PLACE_HOLDER: String = "key:value;";
     private lateinit var file: JTextField
     private lateinit var value: JTextArea
     private lateinit var key: JTextField
@@ -32,17 +28,15 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
 
     init {
         setTitle("Configure Kafka producer for topic $topic")
-        init();
+        init()
     }
 
     override fun createCenterPanel(): JPanel {
-        headerKey = HintTextField(PLACE_HOLDER)
-        headerKey.preferredSize = Dimension(250, 24)
-
-
+        headerKey = HintTextField(" key:value;")
+        headerKey.preferredSize = Dimension(400, 24)
 
         key = JTextField()
-        key.preferredSize = Dimension(250, 24)
+        key.preferredSize = Dimension(400, 24)
 
         radios = arrayOf("Load from file ", "Text ").map { JRadioButton(it) }
 
@@ -56,15 +50,10 @@ class ProduceDialog(val project: Project, topic: String) : DialogWrapper(false),
             val fcd = FileChooserDescriptor(true, false, false, false, false, false)
             file.text = FileChooser.chooseFile(fcd, project, null)?.canonicalPath
         }
-
         compression = ComboBox(KAFKA_COMPRESSION_TYPES)
 
-        var headerPanel = JPanel(GridLayout(0, 2))
-        headerPanel.add(layoutLR(JBLabel("header: "), headerKey))
-        headerPanel.add(layoutLR(JBLabel("key of message"), key))
-
         val panel = JPanel(BorderLayout())
-        panel.add(headerPanel, BorderLayout.NORTH)
+        panel.add(layoutUD(layoutLR(JBLabel("Header"), headerKey), layoutLR(JBLabel("Key      "), key)), BorderLayout.NORTH)
         panel.add(JBLabel("Value"), BorderLayout.CENTER)
         panel.add(layoutUD(
                 layoutLR(radios[1], JBScrollPane(value)),

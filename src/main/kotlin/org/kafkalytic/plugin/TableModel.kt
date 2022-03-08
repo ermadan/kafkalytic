@@ -1,5 +1,6 @@
 package org.kafkalytic.plugin
 
+import java.util.concurrent.ExecutionException
 import javax.swing.table.DefaultTableModel
 import javax.swing.tree.TreeNode
 
@@ -12,7 +13,11 @@ class TopicTableModel : DefaultTableModel() {
         dataVector.clear()
         if (node != null) {
             if (node is KTopicTreeNode) {
-                node.zooPropValues()?.forEach { addRow(it) }
+                try {
+                    node.zooPropValues()?.forEach { addRow(it) }
+                } catch (e: ExecutionException) {
+                    logger.warning("can't build table: $e")
+                }
             }
         }
     }
