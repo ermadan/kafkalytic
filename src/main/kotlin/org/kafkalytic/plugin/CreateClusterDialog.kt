@@ -41,6 +41,7 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
     private lateinit var keyPath: JTextField
     private lateinit var trustPassword: JTextField
     private lateinit var keyPassword: JTextField
+    private lateinit var keyPassword2: JTextField
     private lateinit var requestTimeout: JTextField
     private lateinit var saslMechanism: JTextField
     private lateinit var saslJaasConfig: JTextField
@@ -87,6 +88,7 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
                 props.getProperty("ssl.truststore.type")?.let { trustType.text = it }
                 props.getProperty("ssl.keystore.location")?.let { keyPath.text = it }
                 props.getProperty("ssl.keystore.password")?.let { keyPassword.text = it }
+                props.getProperty("ssl.key.password")?.let { keyPassword2.text = it }
                 props.getProperty("sasl.mechanism")?.let { saslMechanism.text = it }
                 props.getProperty("security.protocol")?.let { securityProtocol.text = it }
                 props.getProperty("sasl.jaas.config")?.let { saslJaasConfig.text = it }
@@ -100,6 +102,7 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         keyPath = HintTextField("local path")
         trustPassword = JTextField()
         keyPassword = JTextField()
+        keyPassword2 = JTextField()
         requestTimeout = JTextField("5000")
         requestTimeout.inputVerifier = INT_VERIFIER
         trustType = JTextField()
@@ -111,6 +114,7 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         certSubPanel.addLabelled("Request timeout, ms", requestTimeout)
         certSubPanel.addLabelled("Keystore path", keyPath)
         certSubPanel.addLabelled("Keystore password", keyPassword)
+        certSubPanel.addLabelled("Key password", keyPassword2)
         certSubPanel.addLabelled("Truststore type", trustType)
         certSubPanel.addLabelled("Security protocol", securityProtocol)
         certSubPanel.addLabelled("SASL mechanism", saslMechanism)
@@ -139,6 +143,7 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
                     "ssl.truststore.password" to trustPassword.text,
                     "ssl.keystore.location" to keyPath.text,
                     "ssl.keystore.password" to keyPassword.text,
+                    "ssl.key.password" to keyPassword2.text,
                     "ssl.truststore.type" to trustType.text,
                     "sasl.mechanism" to saslMechanism.text,
                     "security.protocol" to securityProtocol.text,
