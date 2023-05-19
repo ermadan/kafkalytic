@@ -7,11 +7,11 @@ import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
 
 class CellRenderer : ColoredTreeCellRenderer() {
-    val leafIcon = IconLoader.getIcon("/icons/add.png")
-    val folderIcon = IconLoader.getIcon("/icons/webFolder.png")
-    val topicIcon = IconLoader.getIcon("/icons/read-access.png")
-    val consumerIcon = IconLoader.getIcon("/icons/weblistener.png")
-    val brokerIcon = IconLoader.getIcon("/icons/write-access.png")
+    private val leafIcon = IconLoader.getIcon("/icons/add.png", CellRenderer::class.java)
+    private val folderIcon = IconLoader.getIcon("/icons/webFolder.png", CellRenderer::class.java)
+    private val topicIcon = IconLoader.getIcon("/icons/read-access.png", CellRenderer::class.java)
+    private val consumerIcon = IconLoader.getIcon("/icons/weblistener.png", CellRenderer::class.java)
+    private val brokerIcon = IconLoader.getIcon("/icons/write-access.png", CellRenderer::class.java)
 
     override fun customizeCellRenderer(tree: JTree, node: Any?, selected: Boolean, expanded: Boolean,
                                        leaf: Boolean, row: Int, hasFocus: Boolean) {
