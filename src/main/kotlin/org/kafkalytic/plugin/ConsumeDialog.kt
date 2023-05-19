@@ -1,5 +1,6 @@
 package org.kafkalytic.plugin
 
+import io.confluent.kafka.serializers.KafkaAvroDeserializer
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
@@ -22,6 +23,7 @@ class ConsumeDialog(topic: String, val config: KafkaStateComponent) : DialogWrap
     private lateinit var offset: JTextField
     private lateinit var keyDeserializer: JComboBox<String>
     private lateinit var valueDeserializer: JComboBox<String>
+    private lateinit var schemaRegistryUrl: JTextField
     private lateinit var radios: List<JRadioButton>
     private lateinit var printOptionsPanel: PrintOptionsPanel
     override fun stateChanged(e: ChangeEvent?) {
@@ -43,7 +45,8 @@ class ConsumeDialog(topic: String, val config: KafkaStateComponent) : DialogWrap
                 ByteArrayDeserializer::class.java,
                 IntegerDeserializer::class.java,
                 LongDeserializer::class.java,
-                DoubleDeserializer::class.java).map { it.getSimpleName() }.toTypedArray()
+                DoubleDeserializer::class.java,
+                KafkaAvroDeserializer::class.java).map { it.getSimpleName() }.toTypedArray()
         keyDeserializer = ComboBox(deserializers)
         keyDeserializer.preferredSize = Dimension(40, 24)
         valueDeserializer = ComboBox(deserializers)
@@ -79,6 +82,11 @@ class ConsumeDialog(topic: String, val config: KafkaStateComponent) : DialogWrap
         offset = JTextField()
         methodSubPanel.add(offset)
         methodSubPanel.add(JLabel(" offset"))
+
+        schemaRegistryUrl = JTextField()
+        methodSubPanel.add(schemaRegistryUrl)
+        methodSubPanel.add(JLabel(" schema registry url"))
+
         val radioGroup = ButtonGroup()
         radios.forEach {
             radioGroup.add(it)
@@ -91,11 +99,12 @@ class ConsumeDialog(topic: String, val config: KafkaStateComponent) : DialogWrap
         return layoutUD(deserizalizerSubPanel, methodSubPanel, printOptionsPanel)
     }
 
-    fun getKeyDeserializer() = "org.apache.kafka.common.serialization." + keyDeserializer.selectedItem
-    fun getValueDeserializer() = "org.apache.kafka.common.serialization." + valueDeserializer.selectedItem
+    fun getKeyDeserializer() = if ("KafkaAvroDeserializer" == keyDeserializer.selectedItem) "io.confluent.kafka.serializers." + keyDeserializer.selectedItem else "org.apache.kafka.common.serialization." + keyDeserializer.selectedItem
+    fun getValueDeserializer() = if ("KafkaAvroDeserializer" == valueDeserializer.selectedItem) "io.confluent.kafka.serializers." + valueDeserializer.selectedItem else "org.apache.kafka.common.serialization." + valueDeserializer.selectedItem
     fun getDecrement() = if (radios[1].isSelected) decrement.text.toInt() else 0
     fun getPartition() = if (radios[2].isSelected) partition.text.toInt() else 0
     fun getOffset() = if (radios[2].isSelected) offset.text.toLong() else 0
+    fun getSchemaRegistryUrl() = schemaRegistryUrl.text
     fun getWaitFor() = if (radios[0].isSelected) waitFor.text.toInt() else 0
     fun getPolls() = if (radios[0].isSelected) polls.text.toInt() else 0
     fun getMode() = if (radios[0].isSelected) 0 else if (radios[1].isSelected) 1 else 2

@@ -400,7 +400,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
         val searchTextField = SearchTextField()
         searchTextField.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) {
-                val pattern = e.document.getText(0, e.document.length).toLowerCase()
+                val pattern = e.document.getText(0, e.document.length).lowercase(Locale.getDefault())
                 val nodes = findNodes(zRoot, pattern).map { leaf ->
                     generateSequence(leaf) { it.parent }.toList().reversed().toTypedArray()
                 }.map {
@@ -421,7 +421,7 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
     private fun findNodes(parent: TreeNode, text: String): Collection<TreeNode> {
         val children = (parent.children() as Enumeration<TreeNode>).toList()
         return children
-                .mapNotNull { if (it.toString().toLowerCase().indexOf(text) >= 0) listOf(it) else findNodes(it, text) }
+                .mapNotNull { if (it.toString().lowercase(Locale.getDefault()).indexOf(text) >= 0) listOf(it) else findNodes(it, text) }
                 .flatten()
                 .filter { it is KTopicTreeNode }
     }
@@ -576,13 +576,13 @@ class MainWindow(stateComponent: KafkaStateComponent, private val project: Proje
             val (lang, value) = format(record.value())
             val header = extractCustomHeader(record.headers())
             if (config.config["printToEditorSelected"]?.toBoolean() != false) {
-                openEditor(key, "${ if (header.isEmpty()) "" else "header: ${header}"} ${value}", lang)
+                openEditor(key, "${ if (header.isEmpty()) "" else "header: $header"} $value", lang)
             }
             if (config.config["printToFileSelected"]?.toBoolean() == true) {
                 Files.write(Paths.get(config.config["printToFile"]), "${ if (header.isEmpty()) "" else  "header: ${header}"} \n ${value}".toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
             }
             Notifications.Bus.notify(Notification("Kafkalytic", "topic:${record.topic()}",
-                "${ if (header.isEmpty()) "" else  "header: ${header} \n"} key: $key, partition:${record.partition()}, offset:${record.offset()}" +
+                "${ if (header.isEmpty()) "" else  "header: $header \n"} key: $key, partition:${record.partition()}, offset:${record.offset()}" +
                             if (config.config["printToEventSelected"]?.toBoolean() != false) ", message:\n$value" else "",
                     NotificationType.INFORMATION))
         }

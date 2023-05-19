@@ -31,11 +31,11 @@
         <applicationService serviceImplementation="org.kafkalytic.plugin.KafkaStateComponent"/>
 
         <toolWindow id="Kafkalytic" anchor="right" factoryClass="org.kafkalytic.plugin.KafkalyticToolWindowFactory" icon="/icons/kafka2.svg"/>
-        <notificationGroup id="Kafkalytic" displayType="BALLOON" key="notification.group.name"/>
+        <notificationGroup id="Kafkalytic" displayType="BALLOON"/>
     </extensions>
     <change-notes>
-        - removed zookeeper dependency with vulnerable log4j
+        - avro deserializer added
     </change-notes>
     <depends>com.intellij.modules.lang</depends>
-    <idea-version since-build="180.*"/>
+    <idea-version since-build="202.*"/>
 </idea-plugin>

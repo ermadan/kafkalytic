@@ -1,6 +1,6 @@
 package org.kafkalytic.plugin
 
-fun main(argv: Array<String>) {
+fun main() {
 //    val cl = AdminClient.create(Cluster("scoreu01.uk.db.com:9093",
 //            "c:/temp/scoreu01.uk.db.com.jks", "sdcSd/dU0ICbqdir+mI5UA",
 //            "c:/temp/scoreu01.uk.db.com.jks", "sdcSd/dU0ICbqdir+mI5UA"

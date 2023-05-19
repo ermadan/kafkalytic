@@ -15,6 +15,9 @@ fun consume(topic: String, props: Map<String, Any>, dialog: ConsumeDialog, progr
     local.put("session.timeout.ms", "30000")
     local.put("key.deserializer", Class.forName(dialog.getKeyDeserializer()))
     local.put("value.deserializer", Class.forName(dialog.getValueDeserializer()))
+    if (!dialog.getSchemaRegistryUrl().isNullOrEmpty())
+        local.put("schema.registry.url", dialog.getSchemaRegistryUrl())
+
 //    local.put("max.poll.records", 1)
 
     LOG.info(local.toString())

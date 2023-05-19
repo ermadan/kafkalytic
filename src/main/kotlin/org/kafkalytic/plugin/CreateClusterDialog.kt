@@ -23,7 +23,7 @@ import javax.swing.table.DefaultTableModel
 
 class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         "Enter Kafka bootstrap servers as host:port,host2:port",
-        "New cluster",
+        "New Cluster",
         Messages.getQuestionIcon(),
         null,
         object : InputValidator {
@@ -127,18 +127,20 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
     }
 
     fun getCluster(): MutableMap<String, String> {
-        var props = tableModel.dataVector.elements().asSequence()
+        val props = tableModel.dataVector.elements().asSequence()
                 .map { val v = it as Vector<*>; v[0].toString() to v[1].toString() }.toMap().toMutableMap()
         if (!myField.text.trim().isNullOrEmpty()) {
             props["bootstrap.servers"] = myField.text.trim()
         }
         props.put("name", name.text.ifBlank { props["bootstrap.servers"]!! })
+        if (securityProtocol.text.isNotBlank()) {
+            props["security.protocol"] = securityProtocol.text
+        }
         if (requestTimeout.text.isNotBlank()) {
             props["request.timeout.ms"] = requestTimeout.text
         }
         if (trustPath.text.isNotBlank()) {
             props.putAll(mapOf(
-                    "security.protocol" to "SSL",
                     "ssl.truststore.location" to trustPath.text,
                     "ssl.truststore.password" to trustPassword.text,
                     "ssl.keystore.location" to keyPath.text,
@@ -151,7 +153,7 @@ class CreateClusterDialog(val project: Project) : Messages.InputDialog(
         }
         LOG.info("connection properties:$props")
         //fix ssl handshake
-        props.put("ssl.endpoint.identification.algorithm", "");
+        props.put("ssl.endpoint.identification.algorithm", "")
         return props
     }
 }
